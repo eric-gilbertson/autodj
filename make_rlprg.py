@@ -1,4 +1,4 @@
-#!/usr/bin/python
+##!/usr/bin/python
 
 import datetime, sys, getopt, os
 from array import *
@@ -33,6 +33,7 @@ day_extras = {
     'Saturday' : [],
 }
 
+is_today = True
 run_immediate = False
 
 show_date = datetime.datetime.now().strftime("%Y-%m-%d")
@@ -51,6 +52,7 @@ def parse_args(argv):
          print 'test.py -date YYYY-MM-DD'
          sys.exit()
       elif opt in ("-d", "--date"):
+         is_today = False
          show_date = arg
 
    print 'Show date: "', show_date
@@ -108,6 +110,8 @@ shows_path = UPLOAD_DIR + show_date + "*.mp3"
 show_day = datetime.datetime.strptime(show_date, '%Y-%m-%d').strftime('%A')
 is_weekend = show_day != 'Saturday' and show_day != 'Sunday'
 out_file = open('{}/{}.rlprg'.format(UPLOAD_DIR,show_day), "w");
+run_time = datetime.datetime.now().time()
+#TODO check for newscast time if weekday and abort
 
 print('shows for {0}, {1}'.format(show_date, show_day))
 shows = glob.glob(shows_path)
@@ -134,6 +138,11 @@ for show in shows:
     start_time = time_ar[0]
     end_time = time_ar[1]
     is_silent = show_title == SILENCE_TRACK
+
+    start_time_obj = datetime.datetime.strptime(start_time, '%H%M').time()
+    if is_today and start_time_obj < run_time:
+        print("skip past show: " + show_title)
+        continue
 
     if is_first:
         emit_zootopia_end(start_time)
