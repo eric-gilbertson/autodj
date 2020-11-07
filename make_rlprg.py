@@ -142,7 +142,7 @@ for show in shows:
     is_silent = show_title == SILENCE_TRACK
 
     # skip this check for shows after midnight (KZSU time)
-    if is_today and int(start_time) <= 2400:
+    if is_today and int(start_time) < 2400:
         start_time_obj = datetime.datetime.strptime(start_time, '%H%M').time()
         if start_time_obj < run_time:
             print("skip past show: " + show_title)
