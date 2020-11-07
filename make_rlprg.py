@@ -9,11 +9,13 @@ import commands
 GDRIVE_PATH = '/Volumes/GoogleDrive/My Drive'
 #GDRIVE_PATH = '/Users/Barbara/GoogleDrive/My Drive'
 
+SILENCE_FILE = '	file:///Volumes/GoogleDrive/My%20Drive/show_uploads/silence.aiff'
+
 SPOTBOX_PATH = GDRIVE_PATH + '/spotbox audio/'
 
-START_BREAK = '	file:///Applications/RadioLogik%20DJ.app/Contents/Resources/silence.aif	false	{0}						Time Break'
-STOP_ZOOTOPIA = '	file:///Applications/RadioLogik%20DJ.app/Contents/Resources/silence.aif	false	{0}	2					Zootopia - off'
-START_ZOOTOPIA = '	file:///Applications/RadioLogik%20DJ.app/Contents/Resources/silence.aif	false	{0}	1					Zootopia - on'
+START_BREAK = SILENCE_FILE + '	false	{0}						Time Break'
+STOP_ZOOTOPIA = SILENCE_FILE + '	false	{0}	2					Zootopia - off'
+START_ZOOTOPIA = SILENCE_FILE + '	false	{0}	1					Zootopia - on'
 PLAY_PROGRAM  = '	file://{}	false	-1					{}'
 
 UPLOAD_DIR = GDRIVE_PATH + '/show_uploads/'
@@ -39,7 +41,7 @@ run_immediate = False
 show_date = datetime.datetime.now().strftime("%Y-%m-%d")
 
 def parse_args(argv):
-   global show_date
+   global show_date, is_today
 
    try:
       opts, args = getopt.getopt(argv,"d:",["date"])
@@ -81,7 +83,7 @@ def emit_break(time_str):
     emit_line(START_BREAK.format(rl_time))
 
 def emit_LID():
-    lid_file = GDRIVE_PATH + '/spotbox audio/LID_0.06_Gonna Need Speakers.wav'
+    lid_file = GDRIVE_PATH + '/spotbox audio/LID_0.02_Standard LID_The "KZSU Guy"_Official_2004 __.wav'
     emit_program_play(lid_file, "LID")
 
 def emit_program_play(show_file, show_title):
@@ -139,10 +141,12 @@ for show in shows:
     end_time = time_ar[1]
     is_silent = show_title == SILENCE_TRACK
 
-    start_time_obj = datetime.datetime.strptime(start_time, '%H%M').time()
-    if is_today and start_time_obj < run_time:
-        print("skip past show: " + show_title)
-        continue
+    # skip this check for shows after midnight (KZSU time)
+    if is_today and int(start_time) <= 2400:
+        start_time_obj = datetime.datetime.strptime(start_time, '%H%M').time()
+        if start_time_obj < run_time:
+            print("skip past show: " + show_title)
+            continue
 
     if is_first:
         emit_zootopia_end(start_time)
