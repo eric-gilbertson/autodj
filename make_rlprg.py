@@ -20,9 +20,6 @@ PLAY_PROGRAM  = '	file://{}	false	-1					{}'
 
 UPLOAD_DIR = GDRIVE_PATH + '/show_uploads/'
 
-SILENCE_TRACK="SilenceTrack.mp3"
-#UPW_INTRO_TRACK= SPOTBOX_PATH + 'UPW Intro 2020.mp3'
-#UPW_OUTO_TRACK= SPOTBOX_PATH + 'UPW Outro 2020.mp3'
 UPW_INTRO_TRACK= 'UPW Intro 2020.mp3'
 UPW_OUTO_TRACK= 'UPW Outro 2020.mp3'
 day_extras = {
@@ -139,7 +136,6 @@ for show in shows:
     time_ar = info_ar[1].split('-')
     start_time = time_ar[0]
     end_time = time_ar[1]
-    is_silent = show_title == SILENCE_TRACK
 
     # skip this check for shows after midnight (KZSU time)
     if is_today and int(start_time) < 2400:
@@ -154,21 +150,21 @@ for show in shows:
     if not is_weekend and is_news_show(start_time, end_time):
         emit_zootopia_start(start_time)
     else:
-        if not is_first and not prev_silent and prev_end_time != start_time:
+        if not is_first and prev_end_time != start_time:
             emit_zootopia_start(prev_end_time)
             emit_zootopia_end(start_time)
         elif not is_first:
             emit_break(start_time)
 
-        if not is_silent:
-            if start_time.endswith('00'):
-                emit_LID()
+        # emit LID iff TOTH and shows are consecutive. this prevents double broadcast of LID 
+        # becuase Zootopia emits one as well so not need to do it if coming off of it.
+        if prev_end_time == start_time and start_time.endswith('00'):
+            emit_LID()
 
-            emit_program_play(show, show_title)
+        emit_program_play(show, show_title)
 
     is_first = False
     prev_end_time = end_time
-    prev_silent = is_silent
 
 # reenable Zootopia
 emit_zootopia_start(end_time)
