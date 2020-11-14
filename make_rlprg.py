@@ -20,8 +20,6 @@ PLAY_PROGRAM  = '	file://{}	false	-1					{}'
 
 UPLOAD_DIR = GDRIVE_PATH + '/show_uploads/'
 
-UPW_INTRO_TRACK= 'UPW Intro 2020.mp3'
-UPW_OUTO_TRACK= 'UPW Outro 2020.mp3'
 day_extras = {
     'Sunday' : [],
     'Monday' : [],
@@ -156,9 +154,7 @@ for show in shows:
         elif not is_first:
             emit_break(start_time)
 
-        # emit LID iff TOTH and shows are consecutive. this prevents double broadcast of LID 
-        # becuase Zootopia emits one as well so not need to do it if coming off of it.
-        if prev_end_time == start_time and start_time.endswith('00'):
+        if start_time.endswith('00'):
             emit_LID()
 
         emit_program_play(show, show_title)
