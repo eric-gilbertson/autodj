@@ -10,6 +10,7 @@ GDRIVE_PATH = '/Volumes/GoogleDrive/My Drive'
 #GDRIVE_PATH = '/Users/Barbara/GoogleDrive/My Drive'
 
 SILENCE_FILE = '	file:///Volumes/GoogleDrive/My%20Drive/show_uploads/silence.aiff'
+OUTRO_FILE = '/Volumes/GoogleDrive/My Drive/show_uploads/show_fill.mp3'
 
 SPOTBOX_PATH = GDRIVE_PATH + '/spotbox audio/'
 
@@ -101,6 +102,33 @@ def add_extras_for_day(shows, day_ord, date_str):
         print(" add: " + add_item)
         shows.append(add_item) ######
 
+# return duration in seconds from KZSU time. not using Date because KZSU time ends at 3000hours.
+def get_schedule_duration(start_time, end_time):
+    start_seconds = int(start_time[:2]) * 3600 + int(start_time[2:]) * 60
+    end_seconds = int(end_time[:2]) * 3600 + int(end_time[2:]) * 60
+    return end_seconds - start_seconds
+
+
+# return time length of an mp3 file using ffmpeg or -1 if invalid.
+# assumes user has ffmpeg in PATH.
+def get_mp3_duration(filePath):
+    FFMPEG_CMD = "/usr/local/bin/ffmpeg -hide_banner "
+    duration = -1
+    try:
+        cmd = FFMPEG_CMD + "-i '" + filePath + "'"
+        ret_val = commands.getstatusoutput(cmd)
+        print("Execute: {} returned {}, {}".format(cmd, ret_val[0], ret_val[1]))
+        if ret_val[1] and ret_val[1].find("Duration:") > 0:
+            time_str = ret_val[1]
+            idx1 = time_str.index('Duration:') + 9
+            idx2 = time_str.index(',', idx1)
+            time_str = time_str[idx1:idx2].strip()
+            time = datetime.datetime.strptime(time_str, '%H:%M:%S.%f')
+            duration = time.second + time.minute * 60 + time.hour * 3600
+    except:
+        print('Could not get duration for: ' + filePath)
+
+    return duration
 
 parse_args(sys.argv[1:])
 shows_path = UPLOAD_DIR + show_date + "*.mp3"
@@ -136,7 +164,8 @@ for show in shows:
     end_time = time_ar[1]
 
     # skip this check for shows after midnight (KZSU time)
-    if is_today and int(start_time) < 2400:
+    is_valid_time = int(start_time) < 2400
+    if is_today and is_valid_time:
         start_time_obj = datetime.datetime.strptime(start_time, '%H%M').time()
         if start_time_obj < run_time:
             print("skip past show: " + show_title)
@@ -158,6 +187,14 @@ for show in shows:
             emit_LID()
 
         emit_program_play(show, show_title)
+
+        # skip this check if show start >= midnight
+        if is_valid_time:
+            schedule_duration = get_schedule_duration(start_time, end_time)
+            file_duration = get_mp3_duration(show)
+            is_short = file_duration > 0 and schedule_duration - file_duration > 10
+            if is_short:
+                emit_program_play(OUTRO_FILE, "outro")
 
     is_first = False
     prev_end_time = end_time
