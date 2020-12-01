@@ -7,6 +7,7 @@ import urllib
 import commands
 
 GDRIVE_PATH = '/Volumes/GoogleDrive/My Drive'
+KZSU_NEWS_PATH = '/Volumes/GoogleDrive/My Drive/show submissions/Ken Der News'
 #GDRIVE_PATH = '/Users/Barbara/GoogleDrive/My Drive'
 
 SILENCE_FILE = '	file:///Volumes/GoogleDrive/My%20Drive/show_uploads/silence.aiff'
@@ -87,10 +88,17 @@ def emit_program_play(show_file, show_title):
     play_line = PLAY_PROGRAM.format(show_file_encoded, show_title)
     emit_line(play_line)
 
-def is_news_show(start_time_str, end_time_str):
+def emit_kzsu_news(show_file):
+    short_date = datetime.datetime.strptime(show_date, '%Y-%m-%d').strftime('%m%d')
+    news_path = '{}/{}-0900,1200,1700 Ken Der News.mp3'.format(KZSU_NEWS_PATH, short_date)
+    news_file_encoded = urllib.quote(news_path)
+    play_line = PLAY_PROGRAM.format(news_file_encoded, 'KZSU News')
+    emit_line(play_line)
+
+def is_news_gap(start_time_str, end_time_str):
     news_times = [['0900', '0905'], ['1200', '1205'], ['1700', '1705']]
     for news_time in news_times:
-        if start_time == news_time[0] and end_time == news_time[1]:
+        if start_time_str == news_time[0] and end_time_str == news_time[1]:
             return True
 
     return False
@@ -133,7 +141,7 @@ def get_mp3_duration(filePath):
 parse_args(sys.argv[1:])
 shows_path = UPLOAD_DIR + show_date + "*.mp3"
 show_day = datetime.datetime.strptime(show_date, '%Y-%m-%d').strftime('%A')
-is_weekend = show_day != 'Saturday' and show_day != 'Sunday'
+is_weekend = show_day == 'Saturday' or show_day == 'Sunday'
 out_file = open('{}/{}.rlprg'.format(UPLOAD_DIR,show_day), "w");
 run_time = datetime.datetime.now().time()
 #TODO check for newscast time if weekday and abort
@@ -155,6 +163,7 @@ emit_line('Duration:19807')
 prev_end_time = ''
 is_first = True
 for show in shows:
+    is_news = False
     file_name = show[len(UPLOAD_DIR):]
     print("show: " + file_name);
     info_ar = file_name.split('_')
@@ -174,27 +183,29 @@ for show in shows:
     if is_first:
         emit_zootopia_end(start_time)
 
-    if not is_weekend and is_news_show(start_time, end_time):
-        emit_zootopia_start(start_time)
-    else:
-        if not is_first and prev_end_time != start_time:
-            emit_zootopia_start(prev_end_time)
-            emit_zootopia_end(start_time)
-        elif not is_first:
-            emit_break(start_time)
+    if not is_weekend and is_news_gap(prev_end_time, start_time):
+        is_news = True
+        emit_kzsu_news(prev_end_time)
+        prev_end_time = start_time
 
-        if start_time.endswith('00'):
-            emit_LID()
+    if not is_first and prev_end_time != start_time:
+        emit_zootopia_start(prev_end_time)
+        emit_zootopia_end(start_time)
+    elif not is_first and not is_news:
+        emit_break(start_time)
 
-        emit_program_play(show, show_title)
+    if start_time.endswith('00'):
+        emit_LID()
 
-        # skip this check if show start >= midnight
-        if is_valid_time:
-            schedule_duration = get_schedule_duration(start_time, end_time)
-            file_duration = get_mp3_duration(show)
-            is_short = file_duration > 0 and schedule_duration - file_duration > 10
-            if is_short:
-                emit_program_play(OUTRO_FILE, "outro")
+    emit_program_play(show, show_title)
+
+    # skip this check if show start >= midnight
+    if is_valid_time:
+        schedule_duration = get_schedule_duration(start_time, end_time)
+        file_duration = get_mp3_duration(show)
+        is_short = file_duration > 0 and schedule_duration - file_duration > 10
+        if is_short:
+            emit_program_play(OUTRO_FILE, "outro")
 
     is_first = False
     prev_end_time = end_time
