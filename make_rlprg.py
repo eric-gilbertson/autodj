@@ -17,7 +17,8 @@ SPOTBOX_PATH = GDRIVE_PATH + '/spotbox audio/'
 
 START_BREAK = SILENCE_FILE + '	false	{0}						Time Break'
 STOP_ZOOTOPIA = SILENCE_FILE + '	false	{0}	2					Zootopia - off'
-START_ZOOTOPIA = SILENCE_FILE + '	false	{0}	1					Zootopia - on'
+START_ZOOTOPIA_TIMED = SILENCE_FILE + '	false	{0}	1					ZootopiaInt - on'
+START_ZOOTOPIA = SILENCE_FILE + '	false	-1	1					Zootopia - on'
 PLAY_PROGRAM  = '	file://{}	false	-1					{}'
 
 UPLOAD_DIR = GDRIVE_PATH + '/show_uploads/'
@@ -67,9 +68,12 @@ def get_rltime(time_str):
     rltime = int(hours) * 3600 + int(minutes) * 60
     return rltime
 
-def emit_zootopia_start(time_str):
+def emit_zootopia_start_timed(time_str):
     rl_time = get_rltime(time_str)
-    emit_line(START_ZOOTOPIA.format(rl_time))
+    emit_line(START_ZOOTOPIA_TIMED.format(rl_time))
+
+def emit_zootopia_start():
+    emit_line(START_ZOOTOPIA)
 
 def emit_zootopia_end(time_str):
     rl_time = get_rltime(time_str)
@@ -95,11 +99,11 @@ def emit_kzsu_news(show_file):
     play_line = PLAY_PROGRAM.format(news_file_encoded, 'KZSU News')
     emit_line(play_line)
 
-def is_news_gap(start_time_str, end_time_str):
+def get_news_start_time_for_time(end_time_str):
     news_times = [['0900', '0905'], ['1200', '1205'], ['1700', '1705']]
     for news_time in news_times:
-        if start_time_str == news_time[0] and end_time_str == news_time[1]:
-            return True
+        if end_time_str == news_time[1]:
+            return news_time[0]
 
     return False
 
@@ -160,10 +164,9 @@ emit_line('Duration:19807')
 
 #TODO - handle no shows case
 
-prev_end_time = ''
+prev_end_time = False
 is_first = True
 for show in shows:
-    is_news = False
     file_name = show[len(UPLOAD_DIR):]
     print("show: " + file_name);
     info_ar = file_name.split('_')
@@ -180,19 +183,21 @@ for show in shows:
             print("skip past show: " + show_title)
             continue
 
-    if is_first:
-        emit_zootopia_end(start_time)
+    news_start_time = get_news_start_time_for_time(start_time) if not is_weekend else False
+    block_start_time = news_start_time if news_start_time else start_time
 
-    if not is_weekend and is_news_gap(prev_end_time, start_time):
-        is_news = True
-        emit_kzsu_news(prev_end_time)
+    if is_first or (prev_end_time and prev_end_time != block_start_time):
+        if prev_end_time:
+            emit_zootopia_start()
+
+        emit_zootopia_end(block_start_time)
+
+    if news_start_time:
+        if prev_end_time == news_start_time:
+            emit_break(news_start_time)
+        emit_LID()
+        emit_kzsu_news(news_start_time)
         prev_end_time = start_time
-
-    if not is_first and prev_end_time != start_time:
-        emit_zootopia_start(prev_end_time)
-        emit_zootopia_end(start_time)
-    elif not is_first and not is_news:
-        emit_break(start_time)
 
     if start_time.endswith('00'):
         emit_LID()
@@ -203,15 +208,18 @@ for show in shows:
     if is_valid_time:
         schedule_duration = get_schedule_duration(start_time, end_time)
         file_duration = get_mp3_duration(show)
-        is_short = file_duration > 0 and schedule_duration - file_duration > 10
-        if is_short:
-            emit_program_play(OUTRO_FILE, "outro")
+        needs_correction = file_duration > 0 and abs(schedule_duration - file_duration) > 10
+        if needs_correction:
+            if file_duration < schedule_duration:
+                emit_program_play(OUTRO_FILE, "outro")
+
+            emit_break(end_time)
 
     is_first = False
     prev_end_time = end_time
 
 # reenable Zootopia
-emit_zootopia_start(end_time)
+emit_zootopia_start()
 
 out_file.close()
 
