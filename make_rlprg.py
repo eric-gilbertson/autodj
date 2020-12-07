@@ -193,8 +193,6 @@ for show in shows:
         emit_zootopia_end(block_start_time)
 
     if news_start_time:
-        if prev_end_time == news_start_time:
-            emit_break(news_start_time)
         emit_LID()
         emit_kzsu_news(news_start_time)
         prev_end_time = start_time
