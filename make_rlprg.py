@@ -16,9 +16,9 @@ OUTRO_FILE = '/Volumes/GoogleDrive/My Drive/show_uploads/show_fill.mp3'
 SPOTBOX_PATH = GDRIVE_PATH + '/spotbox audio/'
 
 START_BREAK = SILENCE_FILE + '	false	{0}						Time Break'
-STOP_ZOOTOPIA = SILENCE_FILE + '	false	{0}	2					Zootopia - off'
-START_ZOOTOPIA_TIMED = SILENCE_FILE + '	false	{0}	1					ZootopiaInt - on'
-START_ZOOTOPIA = SILENCE_FILE + '	false	-1	1					Zootopia - on'
+START_AUTODJ = SILENCE_FILE + '	squeeze	{0}			file:///Users/engineering/Music/Radiologik/Scripts/AutodjOn.applescript			Autodj - on'
+START_ZOOTOPIA_TIMED = SILENCE_FILE + '	false	{0}		file:///Users/engineering/Music/Radiologik/Scripts/ZootopiaOn.applescript				ZootopiaInt - on'
+START_ZOOTOPIA = SILENCE_FILE + '	false	-1			file:///Users/engineering/Music/Radiologik/Scripts/ZootopiaOn.applescript			Zootopia - on'
 PLAY_PROGRAM  = '	file://{}	false	-1					{}'
 
 UPLOAD_DIR = GDRIVE_PATH + '/show_uploads/'
@@ -75,9 +75,9 @@ def emit_zootopia_start_timed(time_str):
 def emit_zootopia_start():
     emit_line(START_ZOOTOPIA)
 
-def emit_zootopia_end(time_str):
+def emit_autodj_start(time_str):
     rl_time = get_rltime(time_str)
-    emit_line(STOP_ZOOTOPIA.format(rl_time))
+    emit_line(START_AUTODJ.format(rl_time))
 
 def emit_break(time_str):
     rl_time = get_rltime(time_str)
@@ -190,7 +190,7 @@ for show in shows:
         if prev_end_time:
             emit_zootopia_start()
 
-        emit_zootopia_end(block_start_time)
+        emit_autodj_start(block_start_time)
 
     if news_start_time:
         emit_LID()
