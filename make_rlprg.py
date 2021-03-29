@@ -16,9 +16,15 @@ OUTRO_FILE = '/Volumes/GoogleDrive/My Drive/show_uploads/show_fill.mp3'
 SPOTBOX_PATH = GDRIVE_PATH + '/spotbox audio/'
 
 START_BREAK = SILENCE_FILE + '	false	{0}						Time Break'
+
 START_AUTODJ = SILENCE_FILE + '	squeeze	{0}			file:///Users/engineering/Music/Radiologik/Scripts/AutodjOn.applescript			Autodj - on'
+
 START_ZOOTOPIA_TIMED = SILENCE_FILE + '	false	{0}		file:///Users/engineering/Music/Radiologik/Scripts/ZootopiaOn.applescript				ZootopiaInt - on'
+
 START_ZOOTOPIA = SILENCE_FILE + '	false	-1			file:///Users/engineering/Music/Radiologik/Scripts/ZootopiaOn.applescript			Zootopia - on'
+
+START_SILENCE = SILENCE_FILE + '	false	-1			file:///Users/engineering/Music/Radiologik/Scripts/MusicOff.applescript			Music - off'
+
 PLAY_PROGRAM  = '	file://{}	false	-1					{}'
 
 UPLOAD_DIR = GDRIVE_PATH + '/show_uploads/'
@@ -75,6 +81,9 @@ def emit_zootopia_start_timed(time_str):
 def emit_zootopia_start():
     emit_line(START_ZOOTOPIA)
 
+def emit_silence_start():
+    emit_line(START_SILENCE)
+
 def emit_autodj_start(time_str):
     rl_time = get_rltime(time_str)
     emit_line(START_AUTODJ.format(rl_time))
@@ -84,7 +93,9 @@ def emit_break(time_str):
     emit_line(START_BREAK.format(rl_time))
 
 def emit_LID():
-    lid_file = GDRIVE_PATH + '/spotbox audio/LID_0.02_Standard LID_The "KZSU Guy"_Official_2004 __.wav'
+    # this file should have 1 second of lead silence becasuse of the delay
+    # incurred when switching from Zootopia to AutoDJ.
+    lid_file = GDRIVE_PATH + '/spotbox audio/LID_KZSU_Guy.mp3'
     emit_program_play(lid_file, "LID")
 
 def emit_program_play(show_file, show_title):
@@ -146,6 +157,7 @@ parse_args(sys.argv[1:])
 shows_path = UPLOAD_DIR + show_date + "*.mp3"
 show_day = datetime.datetime.strptime(show_date, '%Y-%m-%d').strftime('%A')
 is_weekend = show_day == 'Saturday' or show_day == 'Sunday'
+is_sunday = show_day == 'Sunday'
 out_file = open('{}/{}.rlprg'.format(UPLOAD_DIR,show_day), "w");
 run_time = datetime.datetime.now().time()
 #TODO check for newscast time if weekday and abort
@@ -188,7 +200,10 @@ for show in shows:
 
     if is_first or (prev_end_time and prev_end_time != block_start_time):
         if prev_end_time:
-            emit_zootopia_start()
+            if is_sunday and prev_end_time == '1200':
+                emit_silence_start()
+            else:
+                emit_zootopia_start()
 
         emit_autodj_start(block_start_time)
 
