@@ -103,21 +103,6 @@ def emit_program_play(show_file, show_title):
     play_line = PLAY_PROGRAM.format(show_file_encoded, show_title)
     emit_line(play_line)
 
-def emit_kzsu_news(show_file):
-    short_date = datetime.datetime.strptime(show_date, '%Y-%m-%d').strftime('%m%d')
-    news_path = '{}/{}-0900,1200,1700 Ken Der News.mp3'.format(KZSU_NEWS_PATH, short_date)
-    news_file_encoded = urllib.quote(news_path)
-    play_line = PLAY_PROGRAM.format(news_file_encoded, 'KZSU News')
-    emit_line(play_line)
-
-def get_news_start_time_for_time(end_time_str):
-    news_times = [['0900', '0905'], ['1200', '1205'], ['1700', '1705']]
-    for news_time in news_times:
-        if end_time_str == news_time[1]:
-            return news_time[0]
-
-    return False
-
 def add_extras_for_day(shows, day_ord, date_str):
     extras = day_extras[day_ord]
     for extra in extras:
@@ -195,8 +180,7 @@ for show in shows:
             print("skip past show: " + show_title)
             continue
 
-    news_start_time = get_news_start_time_for_time(start_time) if not is_weekend else False
-    block_start_time = news_start_time if news_start_time else start_time
+    block_start_time = start_time
 
     if is_first or (prev_end_time and prev_end_time != block_start_time):
         if prev_end_time:
@@ -206,11 +190,6 @@ for show in shows:
                 emit_zootopia_start()
 
         emit_autodj_start(block_start_time)
-
-    if news_start_time:
-        emit_LID()
-        emit_kzsu_news(news_start_time)
-        prev_end_time = start_time
 
     if start_time.endswith('00'):
         emit_LID()
