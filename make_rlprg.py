@@ -1,14 +1,12 @@
 ##!/usr/bin/python
 
-import datetime, sys, getopt, os
+import datetime, sys, getopt, os, shutil
 from array import *
 import glob
 import urllib
-import commands
 
 GDRIVE_PATH = '/Volumes/GoogleDrive/My Drive'
 KZSU_NEWS_PATH = '/Volumes/GoogleDrive/My Drive/show submissions/Ken Der News'
-#GDRIVE_PATH = '/Users/Barbara/GoogleDrive/My Drive'
 
 SILENCE_FILE = '	file:///Volumes/GoogleDrive/My%20Drive/show_uploads/silence.aiff'
 OUTRO_FILE = '/Volumes/GoogleDrive/My Drive/show_uploads/show_fill.mp3'
@@ -29,8 +27,9 @@ PLAY_PROGRAM  = '	file://{}	false	-1					{}'
 
 UPLOAD_DIR = GDRIVE_PATH + '/show_uploads/'
 
+# extras must start with 3 character day name.
 day_extras = {
-    'Sunday' : [],
+    'Sunday' : ['Sun_1200-1205_UPWintro.mp3'],
     'Monday' : [],
     'Tuesday' : [],
     'Wednesday' : [],
@@ -50,18 +49,18 @@ def parse_args(argv):
    try:
       opts, args = getopt.getopt(argv,"d:",["date"])
    except getopt.GetoptError:
-      print 'test.py -d YYYY-MM-DD'
+      print ('test.py -d YYYY-MM-DD')
       sys.exit(2)
 
    for opt, arg in opts:
       if opt == '-h':
-         print 'test.py -date YYYY-MM-DD'
+         print ('test.py -date YYYY-MM-DD')
          sys.exit()
       elif opt in ("-d", "--date"):
          is_today = False
          show_date = arg
 
-   print 'Show date: "', show_date
+   print ('Show date: {}'.format(show_date))
 
 # converts HH:MM to seconds into the day.
 def emit_line(line):
@@ -99,16 +98,25 @@ def emit_LID():
     emit_program_play(lid_file, "LID")
 
 def emit_program_play(show_file, show_title):
-    show_file_encoded = urllib.quote(show_file)
+    show_file_encoded = urllib.parse.quote_plus(show_file)
     play_line = PLAY_PROGRAM.format(show_file_encoded, show_title)
     emit_line(play_line)
 
 def add_extras_for_day(shows, day_ord, date_str):
     extras = day_extras[day_ord]
     for extra in extras:
-        add_item = '{}{}{}'.format(UPLOAD_DIR, date_str, extra)
-        print(" add: " + add_item)
-        shows.append(add_item) ######
+        name_suffix = extra[3:]
+        src_path = UPLOAD_DIR + extra
+        if os.path.isfile(src_path):
+            add_item = '{}{}{}'.format(UPLOAD_DIR, date_str, name_suffix)
+            # copy is okay if files are small. reconsider if the get large.
+            if not os.path.isfile(add_item):
+                shutil.copy(src_path, add_item)
+
+            print(" add: " + add_item)
+            shows.append(add_item)
+        else:
+            print("Skipping extra missing file: " + src_path)
 
 # return duration in seconds from KZSU time. not using Date because KZSU time ends at 3000hours.
 def get_schedule_duration(start_time, end_time):
