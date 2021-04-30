@@ -98,7 +98,7 @@ def emit_LID():
     emit_program_play(lid_file, "LID")
 
 def emit_program_play(show_file, show_title):
-    show_file_encoded = urllib.parse.quote_plus(show_file)
+    show_file_encoded = urllib.quote(show_file)
     play_line = PLAY_PROGRAM.format(show_file_encoded, show_title)
     emit_line(play_line)
 
