@@ -6,42 +6,48 @@ import glob
 import urllib
 
 GDRIVE_PATH = '/Volumes/GoogleDrive/My Drive'
-KZSU_NEWS_PATH = '/Volumes/GoogleDrive/My Drive/show submissions/Ken Der News'
 
-SILENCE_FILE = '	file:///Volumes/GoogleDrive/My%20Drive/show_uploads/silence.aiff'
+RLDJ_HOME = os.getenv("HOME") + '/Music/Radiologik'
+RLDJ_SCRIPTS = RLDJ_HOME + '/Scripts/'
+
+# NOTE: the tabs in the following defines ARE REQUIRED.
+SILENCE_FILE = '	file:/' + urllib.quote(GDRIVE_PATH + '/show_uploads/silence.aiff')
 OUTRO_FILE = '/Volumes/GoogleDrive/My Drive/show_uploads/show_fill.mp3'
 
-SPOTBOX_PATH = GDRIVE_PATH + '/spotbox audio/'
+SPOTBOX_PATH = GDRIVE_PATH + '/spotbox audio'
 
 START_BREAK = SILENCE_FILE + '	false	{0}						Time Break'
 
-START_AUTODJ = SILENCE_FILE + '	squeeze	{0}			file:///Users/engineering/Music/Radiologik/Scripts/AutodjOn.applescript			Autodj - on'
+START_AUTODJ = SILENCE_FILE + '	squeeze	{0}			file://' + RLDJ_SCRIPTS + 'AutodjOn.applescript			Autodj - on'
 
-START_ZOOTOPIA_TIMED = SILENCE_FILE + '	false	{0}		file:///Users/engineering/Music/Radiologik/Scripts/ZootopiaOn.applescript				ZootopiaInt - on'
+START_ZOOTOPIA_TIMED = SILENCE_FILE + '	false	{0}		file://' + RLDJ_SCRIPTS + 'ZootopiaOn.applescript				ZootopiaInt - on'
 
-START_ZOOTOPIA = SILENCE_FILE + '	false	-1			file:///Users/engineering/Music/Radiologik/Scripts/ZootopiaOn.applescript			Zootopia - on'
+START_ZOOTOPIA = SILENCE_FILE + '	false	-1			file://' + RLDJ_SCRIPTS + 'ZootopiaOn.applescript			Zootopia - on'
 
-START_SILENCE = SILENCE_FILE + '	false	-1			file:///Users/engineering/Music/Radiologik/Scripts/MusicOff.applescript			Music - off'
+START_SILENCE = SILENCE_FILE + '	false	-1			file://' + RLDJ_SCRIPTS + 'MusicOff.applescript			Music - off'
 
 PLAY_PROGRAM  = '	file://{}	false	-1					{}'
 
 UPLOAD_DIR = GDRIVE_PATH + '/show_uploads/'
 
-# extras must start with 3 character day name.
-day_extras = {
-    'Sunday' : ['Sun_1200-1205_UPWintro.mp3'],
-    'Monday' : [],
-    'Tuesday' : [],
-    'Wednesday' : [],
-    'Thursday' : [],
-    'Friday' : [],
-    'Saturday' : [],
-}
-
 is_today = True
 run_immediate = False
 
 show_date = datetime.datetime.now().strftime("%Y-%m-%d")
+
+# parse show file entry into a structure
+class ShowInfo():
+    def __init__(self, show_line):
+        print("show: " + show_line);
+        file_name = show_line[len(UPLOAD_DIR):]
+        info_ar = file_name.split('_')
+        time_ar = info_ar[1].split('-')
+
+        self.day = info_ar[0]
+        self.start_time = time_ar[0]
+        self.end_time = time_ar[1]
+        self.title = info_ar[2]
+
 
 def parse_args(argv):
    global show_date, is_today
@@ -94,7 +100,7 @@ def emit_break(time_str):
 def emit_LID():
     # this file should have 1 second of lead silence becasuse of the delay
     # incurred when switching from Zootopia to AutoDJ.
-    lid_file = GDRIVE_PATH + '/spotbox audio/LID_KZSU_Guy.mp3'
+    lid_file = SPOTBOX_PATH + '/LID_KZSU_Guy.mp3'
     emit_program_play(lid_file, "LID")
 
 def emit_program_play(show_file, show_title):
@@ -103,20 +109,18 @@ def emit_program_play(show_file, show_title):
     emit_line(play_line)
 
 def add_extras_for_day(shows, day_ord, date_str):
-    extras = day_extras[day_ord]
-    for extra in extras:
-        name_suffix = extra[3:]
-        src_path = UPLOAD_DIR + extra
-        if os.path.isfile(src_path):
-            add_item = '{}{}{}'.format(UPLOAD_DIR, date_str, name_suffix)
-            # copy is okay if files are small. reconsider if the get large.
-            if not os.path.isfile(add_item):
-                shutil.copy(src_path, add_item)
+    extras_path = UPLOAD_DIR + day_ord[:3] + "_*.mp3"
+    extras = glob.glob(extras_path)
 
+    for extra in extras:
+        name = extra[len(UPLOAD_DIR):]
+        name_suffix = name[3:]
+        add_item = '{}{}{}'.format(UPLOAD_DIR, date_str, name_suffix)
+        # copy is okay if files are small. reconsider if the get large.
+        if not os.path.isfile(add_item):
+            shutil.copy(extra, add_item)
             print(" add: " + add_item)
             shows.append(add_item)
-        else:
-            print("Skipping extra missing file: " + src_path)
 
 # return duration in seconds from KZSU time. not using Date because KZSU time ends at 3000hours.
 def get_schedule_duration(start_time, end_time):
@@ -153,7 +157,6 @@ is_weekend = show_day == 'Saturday' or show_day == 'Sunday'
 is_sunday = show_day == 'Sunday'
 out_file = open('{}/{}.rlprg'.format(UPLOAD_DIR,show_day), "w");
 run_time = datetime.datetime.now().time()
-#TODO check for newscast time if weekday and abort
 
 print('shows for {0}, {1}'.format(show_date, show_day))
 shows = glob.glob(shows_path)
@@ -170,15 +173,15 @@ emit_line('Duration:19807')
 #TODO - handle no shows case
 
 prev_end_time = False
+prev_silence = False
 is_first = True
-for show in shows:
-    file_name = show[len(UPLOAD_DIR):]
-    print("show: " + file_name);
-    info_ar = file_name.split('_')
-    show_title = info_ar[2]
-    time_ar = info_ar[1].split('-')
-    start_time = time_ar[0]
-    end_time = time_ar[1]
+for show_line in shows:
+    show = ShowInfo(show_line)
+    show_title = show.title
+    start_time = show.start_time
+    end_time = show.end_time
+    is_silence = show.title == 'Silence.mp3'
+    length_mins = int(end_time) - int(start_time)
 
     # skip this check for shows after midnight (KZSU time)
     is_valid_time = int(start_time) < 2400
@@ -191,23 +194,21 @@ for show in shows:
     block_start_time = start_time
 
     if is_first or (prev_end_time and prev_end_time != block_start_time):
-        if prev_end_time:
-            if is_sunday and prev_end_time == '1200':
-                emit_silence_start()
-            else:
-                emit_zootopia_start()
+        if prev_end_time and not prev_silence:
+            emit_zootopia_start()
 
         emit_autodj_start(block_start_time)
 
     if start_time.endswith('00'):
         emit_LID()
 
-    emit_program_play(show, show_title)
+    if not is_silence:
+        emit_program_play(show_line, show_title)
 
-    # skip this check if show start >= midnight
-    if is_valid_time:
+    # skip this check if show start >= midnight or if start and end times are equal
+    if is_valid_time and length_mins > 2:
         schedule_duration = get_schedule_duration(start_time, end_time)
-        file_duration = get_mp3_duration(show)
+        file_duration = get_mp3_duration(show_line)
         needs_correction = file_duration > 0 and abs(schedule_duration - file_duration) > 10
         if needs_correction:
             if file_duration < schedule_duration:
@@ -217,6 +218,7 @@ for show in shows:
 
     is_first = False
     prev_end_time = end_time
+    prev_silence = is_silence
 
 # reenable Zootopia
 emit_zootopia_start()
