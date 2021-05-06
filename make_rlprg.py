@@ -6,6 +6,7 @@ import glob
 import urllib
 
 GDRIVE_PATH = '/Volumes/GoogleDrive/My Drive'
+GDRIVE_PATH = '/Users/Barbara/GoogleDrive/My Drive'  ##### no checkin
 
 RLDJ_HOME = os.getenv("HOME") + '/Music/Radiologik'
 RLDJ_SCRIPTS = RLDJ_HOME + '/Scripts/'
@@ -18,14 +19,9 @@ SPOTBOX_PATH = GDRIVE_PATH + '/spotbox audio'
 
 START_BREAK = SILENCE_FILE + '	false	{0}						Time Break'
 
-START_AUTODJ = SILENCE_FILE + '	squeeze	{0}			file://' + RLDJ_SCRIPTS + 'AutodjOn.applescript			Autodj - on'
-
-START_ZOOTOPIA_TIMED = SILENCE_FILE + '	false	{0}		file://' + RLDJ_SCRIPTS + 'ZootopiaOn.applescript				ZootopiaInt - on'
-
-START_ZOOTOPIA = SILENCE_FILE + '	false	-1			file://' + RLDJ_SCRIPTS + 'ZootopiaOn.applescript			Zootopia - on'
-
-START_SILENCE = SILENCE_FILE + '	false	-1			file://' + RLDJ_SCRIPTS + 'MusicOff.applescript			Music - off'
-
+STOP_ZOOTOPIA = SILENCE_FILE + '	false	{0}	2					Zootopia - off'
+START_ZOOTOPIA_TIMED = SILENCE_FILE + '	false	{0}	1					ZootopiaInt - on'
+START_ZOOTOPIA = SILENCE_FILE + '	false	-1	1					Zootopia - on'
 PLAY_PROGRAM  = '	file://{}	false	-1					{}'
 
 UPLOAD_DIR = GDRIVE_PATH + '/show_uploads/'
@@ -86,12 +82,14 @@ def emit_zootopia_start_timed(time_str):
 def emit_zootopia_start():
     emit_line(START_ZOOTOPIA)
 
-def emit_silence_start():
-    emit_line(START_SILENCE)
-
 def emit_autodj_start(time_str):
+    START_AUTODJ = SILENCE_FILE + '	squeeze	{0}			file://' + RLDJ_SCRIPTS + 'AutodjOn.applescript			Autodj - on'
     rl_time = get_rltime(time_str)
     emit_line(START_AUTODJ.format(rl_time))
+
+def emit_zootopia_end(time_str):
+    rl_time = get_rltime(time_str)
+    emit_line(STOP_ZOOTOPIA.format(rl_time))
 
 def emit_break(time_str):
     rl_time = get_rltime(time_str)
@@ -180,7 +178,6 @@ for show_line in shows:
     show_title = show.title
     start_time = show.start_time
     end_time = show.end_time
-    is_silence = show.title == 'Silence.mp3'
     length_mins = int(end_time) - int(start_time)
 
     # skip this check for shows after midnight (KZSU time)
@@ -194,16 +191,15 @@ for show_line in shows:
     block_start_time = start_time
 
     if is_first or (prev_end_time and prev_end_time != block_start_time):
-        if prev_end_time and not prev_silence:
+        if prev_end_time:
             emit_zootopia_start()
 
-        emit_autodj_start(block_start_time)
+        emit_zootopia_end(block_start_time)
 
     if start_time.endswith('00'):
         emit_LID()
 
-    if not is_silence:
-        emit_program_play(show_line, show_title)
+    emit_program_play(show_line, show_title)
 
     # skip this check if show start >= midnight or if start and end times are equal
     if is_valid_time and length_mins > 2:
@@ -218,7 +214,6 @@ for show_line in shows:
 
     is_first = False
     prev_end_time = end_time
-    prev_silence = is_silence
 
 # reenable Zootopia
 emit_zootopia_start()
