@@ -6,7 +6,6 @@ import glob
 import urllib
 
 GDRIVE_PATH = '/Volumes/GoogleDrive/My Drive'
-GDRIVE_PATH = '/Users/Barbara/GoogleDrive/My Drive'  ##### no checkin
 
 RLDJ_HOME = os.getenv("HOME") + '/Music/Radiologik'
 RLDJ_SCRIPTS = RLDJ_HOME + '/Scripts/'
