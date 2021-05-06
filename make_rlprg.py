@@ -11,7 +11,7 @@ RLDJ_HOME = os.getenv("HOME") + '/Music/Radiologik'
 RLDJ_SCRIPTS = RLDJ_HOME + '/Scripts/'
 
 # NOTE: the tabs in the following defines ARE REQUIRED.
-SILENCE_FILE = '	file:/' + urllib.quote(GDRIVE_PATH + '/show_uploads/silence.aiff')
+SILENCE_FILE = '	file://' + urllib.quote(GDRIVE_PATH + '/show_uploads/silence.aiff')
 OUTRO_FILE = '/Volumes/GoogleDrive/My Drive/show_uploads/show_fill.mp3'
 
 SPOTBOX_PATH = GDRIVE_PATH + '/spotbox audio'
