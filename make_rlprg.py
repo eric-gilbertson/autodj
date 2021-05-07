@@ -1,6 +1,6 @@
 ##!/usr/bin/python
 
-import datetime, sys, getopt, os, shutil
+import datetime, sys, getopt, os, shutil, commands
 from array import *
 import glob
 import urllib
@@ -142,8 +142,8 @@ def get_mp3_duration(filePath):
             time_str = time_str[idx1:idx2].strip()
             time = datetime.datetime.strptime(time_str, '%H:%M:%S.%f')
             duration = time.second + time.minute * 60 + time.hour * 3600
-    except:
-        print('Could not get duration for: ' + filePath)
+    except Exception as ioe:
+        print('Exception getting duration for: {}, {}'.format(cmd, ioe))
 
     return duration
 
