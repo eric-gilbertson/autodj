@@ -6,6 +6,7 @@ import glob
 import urllib
 
 GDRIVE_PATH = '/Volumes/GoogleDrive/My Drive'
+GDRIVE_PATH = '/Users/Barbara/studioq'   ########### no checkin
 
 RLDJ_HOME = os.getenv("HOME") + '/Music/Radiologik'
 RLDJ_SCRIPTS = RLDJ_HOME + '/Scripts/'
@@ -14,6 +15,7 @@ RLDJ_SCRIPTS = RLDJ_HOME + '/Scripts/'
 SILENCE_FILE = '	file://' + urllib.quote(GDRIVE_PATH + '/show_uploads/silence.aiff')
 OUTRO_FILE = '/Volumes/GoogleDrive/My Drive/show_uploads/show_fill.mp3'
 
+START_AUTODJ = SILENCE_FILE + '	squeeze	{0}			file:///Users/engineering/Music/Radiologik/Scripts/AutodjOn.applescript			Autodj - on'
 SPOTBOX_PATH = GDRIVE_PATH + '/spotbox audio'
 
 START_BREAK = SILENCE_FILE + '	false	{0}						Time Break'
@@ -89,6 +91,10 @@ def emit_autodj_start(time_str):
 def emit_zootopia_end(time_str):
     rl_time = get_rltime(time_str)
     emit_line(STOP_ZOOTOPIA.format(rl_time))
+
+def emit_autodj_start(time_str):
+    rl_time = get_rltime(time_str)
+    emit_line(START_AUTODJ.format(rl_time))
 
 def emit_break(time_str):
     rl_time = get_rltime(time_str)
@@ -192,6 +198,10 @@ for show_line in shows:
     if is_first or (prev_end_time and prev_end_time != block_start_time):
         if prev_end_time:
             emit_zootopia_start()
+
+        # in case autodj was enabled, e.g. PACC meeting on Monday evening.
+        if is_first:
+            emit_autodj_start(block_start_time)
 
         emit_zootopia_end(block_start_time)
 
