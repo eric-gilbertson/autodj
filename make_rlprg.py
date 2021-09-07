@@ -1,23 +1,24 @@
 ##!/usr/bin/python
 
-import datetime, sys, getopt, os, shutil, commands
+import datetime, sys, getopt, os, shutil, commands, time
 from array import *
 import glob
 import urllib
 
+HOME_DIR = os.getenv("HOME")
 GDRIVE_PATH = '/Volumes/GoogleDrive/My Drive'
+CACHE_DIR = HOME_DIR + '/Music/show_cache'
 
-RLDJ_HOME = os.getenv("HOME") + '/Music/Radiologik'
+RLDJ_HOME = HOME_DIR + '/Music/Radiologik'
 RLDJ_SCRIPTS = RLDJ_HOME + '/Scripts/'
 
 # NOTE: the tabs in the following defines ARE REQUIRED.
-SILENCE_FILE = '	file://' + urllib.quote(GDRIVE_PATH + '/show_uploads/silence.aiff')
-OUTRO_FILE = '/Volumes/GoogleDrive/My Drive/show_uploads/show_fill.mp3'
+SILENCE_FILE = '	file://' + urllib.quote(CACHE_DIR + '/silence.aiff')
+OUTRO_FILE = CACHE_DIR + '/show_fill.mp3'
 
 START_AUTODJ = SILENCE_FILE + '	false	-1			file:///Users/engineering/Music/Radiologik/Scripts/AutodjOn.applescript			Autodj - on'
 
 START_AUTODJ_TIMED = SILENCE_FILE + '	squeeze	{0}			file:///Users/engineering/Music/Radiologik/Scripts/AutodjOn.applescript			Autodj - on'
-SPOTBOX_PATH = GDRIVE_PATH + '/spotbox audio'
 
 START_BREAK = SILENCE_FILE + '	false	{0}						Time Break'
 
@@ -41,6 +42,7 @@ class ShowInfo():
         info_ar = file_name.split('_')
         time_ar = info_ar[1].split('-')
 
+        self.file_name = file_name
         self.day = info_ar[0]
         self.start_time = time_ar[0]
         self.end_time = time_ar[1]
@@ -103,7 +105,7 @@ def emit_break(time_str):
 def emit_LID():
     # this file should have 1 second of lead silence becasuse of the delay
     # incurred when switching from Zootopia to AutoDJ.
-    lid_file = SPOTBOX_PATH + '/LID_KZSU_Guy.mp3'
+    lid_file = CACHE_DIR + '/LID_KZSU_Guy.mp3'
     emit_program_play(lid_file, "LID")
 
 def emit_program_play(show_file, show_title):
@@ -153,6 +155,21 @@ def get_mp3_duration(filePath):
 
     return duration
 
+# clear any older show files if doing today
+def clear_show_cache():
+    if not is_today:
+        return
+
+    now = datetime.datetime.now()
+    cache_files = glob.glob('{}/{}*.mp3'.format(CACHE_DIR, now.year))
+    for file in cache_files:
+        mtime = time.ctime(os.path.getmtime(file))
+        print("time: {}".format(mtime))
+        if mtime < show_date:
+            print("delete cache file: " + file)
+            os.remove(file)
+          
+
 parse_args(sys.argv[1:])
 shows_path = UPLOAD_DIR + show_date + "*.mp3"
 show_day = datetime.datetime.strptime(show_date, '%Y-%m-%d').strftime('%A')
@@ -160,6 +177,8 @@ is_weekend = show_day == 'Saturday' or show_day == 'Sunday'
 is_sunday = show_day == 'Sunday'
 out_file = open('{}/{}.rlprg'.format(UPLOAD_DIR,show_day), "w");
 run_time = datetime.datetime.now().time()
+
+clear_show_cache()
 
 print('shows for {0}, {1}'.format(show_date, show_day))
 shows = glob.glob(shows_path)
@@ -208,7 +227,11 @@ for show_line in shows:
     if start_time.endswith('00'):
         emit_LID()
 
-    emit_program_play(show_line, show_title)
+    cache_file = CACHE_DIR + '/' + show.file_name
+    if not os.path.exists(cache_file):
+        shutil.copyfile(show_line, cache_file)
+
+    emit_program_play(cache_file, show_title)
 
     # skip this check if show start >= midnight or if start and end times are equal
     if is_valid_time and length_mins > 2:
