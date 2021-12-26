@@ -161,11 +161,13 @@ def clear_show_cache():
         return
 
     now = datetime.datetime.now()
+    now_day = now.timetuple().tm_yday
     cache_files = glob.glob('{}/{}*.mp3'.format(CACHE_DIR, now.year))
     for file in cache_files:
         mtime = time.ctime(os.path.getmtime(file))
-        print("time: {}".format(mtime))
-        if mtime < show_date:
+        mdatetime = datetime.datetime.strptime(mtime, "%c")
+        print("time: {}".format(mdatetime))
+        if mdatetime.timetuple().tm_yday < now_day:
             print("delete cache file: " + file)
             os.remove(file)
           
