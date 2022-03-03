@@ -7,6 +7,7 @@ import urllib
 
 HOME_DIR = os.getenv("HOME")
 GDRIVE_PATH = '/Volumes/GoogleDrive/My Drive'
+#GDRIVE_PATH = '/Users/Barbara/studioq'
 CACHE_DIR = HOME_DIR + '/Music/show_cache'
 
 RLDJ_HOME = HOME_DIR + '/Music/Radiologik'
@@ -84,6 +85,7 @@ def emit_zootopia_start_timed(time_str):
     emit_line(START_ZOOTOPIA_TIMED.format(rl_time))
 
 def emit_zootopia_start():
+    emit_LID()
     emit_line(START_ZOOTOPIA)
 
 def emit_autodj_start_timed():
@@ -169,6 +171,21 @@ def clear_show_cache():
             print("delete cache file: " + file)
             os.remove(file)
           
+def kzsutime_to_minutes(kzsu_time):
+    mins = int(kzsu_time[0:2]) * 60 + int(kzsu_time[2:4])
+    return mins
+
+def minutes_to_kzsutime(minutes):
+    hours = minutes // 60
+    mins = minutes % 60
+    kzsu_time = "{:02}{:02}".format(hours, mins)
+    return kzsu_time
+
+def endtime_from_duration(kzsu_start_time, duration_secs):
+    end_mins = kzsutime_to_minutes(kzsu_start_time) + duration_secs // 60
+    end_time = minutes_to_kzsutime(end_mins)
+    return end_time
+
 
 parse_args(sys.argv[1:])
 shows_path = UPLOAD_DIR + show_date + "*.mp3"
@@ -194,6 +211,7 @@ emit_line('Duration:19807')
 
 #TODO - handle no shows case
 
+TIME_SKEW_SECONDS = 30
 prev_end_time = False
 prev_silence = False
 is_first = True
@@ -202,7 +220,7 @@ for show_line in shows:
     show_title = show.title
     start_time = show.start_time
     end_time = show.end_time
-    length_mins = int(end_time) - int(start_time)
+    length_mins = kzsutime_to_minutes(end_time) - kzsutime_to_minutes(start_time)
 
     # skip this check for shows after midnight (KZSU time)
     is_valid_time = int(start_time) < 2400
@@ -237,12 +255,22 @@ for show_line in shows:
     if is_valid_time and length_mins > 2:
         schedule_duration = get_schedule_duration(start_time, end_time)
         file_duration = get_mp3_duration(show_line)
-        needs_correction = file_duration > 0 and abs(schedule_duration - file_duration) > 10
-        if needs_correction:
-            if file_duration < schedule_duration:
-                emit_program_play(OUTRO_FILE, "outro")
+        time_skew = abs(schedule_duration - file_duration)
+        is_short =  file_duration < schedule_duration
 
-            emit_break(end_time)
+        # do something if time skew > 30 seconds
+        if file_duration > 0 and time_skew > TIME_SKEW_SECONDS:
+            # if gt 5 minutes then turn zootopia back on and adjust end time.
+            if is_short:
+                if time_skew > 300:
+                    end_time = endtime_from_duration(start_time, file_duration)
+                else:
+                    if file_duration < schedule_duration:
+                        emit_program_play(OUTRO_FILE, "outro")
+
+                    emit_break(end_time)
+            elif time_skew > TIME_SKEW_SECONDS:
+                emit_break(end_time)
 
     is_first = False
     prev_end_time = end_time
