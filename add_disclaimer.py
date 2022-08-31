@@ -30,7 +30,8 @@ def get_mp3_duration(filePath):
         time = datetime.datetime.strptime(time_str, '%H:%M:%S.%f')
         duration = time.second + time.minute * 60 + time.hour * 3600
 
-    return duration
+    is_44100Hz = err.find('44100 Hz') > 0
+    return (duration, is_44100Hz)
 
 
 def insert_disclaimer(srcFile):
@@ -38,7 +39,7 @@ def insert_disclaimer(srcFile):
     INSERT_GAP = 30*60 #seconds
     TMP_PATH = 'disclaimer_file'
     retFile = None
-    durationSeconds = get_mp3_duration(srcFile)
+    (durationSeconds, is44100Hz) = get_mp3_duration(srcFile)
 
     if durationSeconds < 0:
         return retFile    
@@ -58,14 +59,17 @@ def insert_disclaimer(srcFile):
 
     cmd = '-y -i "concat:'
     sepChar = ''
+    disclaimFile = 'disclaimer44100.mp3' if is44100Hz else 'disclaimer48000.mp3'
     for i in range(fileCnt):
-        cmd = cmd + '{}disclaimer.mp3|{}{}.mp3'.format(sepChar, TMP_PATH, i)
+        cmd = cmd + '{}{}|{}{}.mp3'.format(sepChar, disclaimFile, TMP_PATH, i)
         sepChar = '|'
 
     destFile = srcFile[0:-4] + '_disclaim.mp3'
-    cmd = cmd + '" -acodec copy ' + destFile
+    cmd = cmd + '" -acodec copy "' + destFile + '"'
     if execute_ffmpeg_command(cmd) == 0:
         retFile = destFile
+    elif os.path.exists(destFile):
+        os.rename(destFile, destFile + ".bad")
 
     return retFile
 
@@ -77,4 +81,4 @@ if __name__ == "__main__":
     else:
         srcFile = sys.argv[1]
         disclaimFile = insert_disclaimer(srcFile)
-        print("File createD : " + disclaimFile)
+        print("Result file : {}".format(disclaimFile))
