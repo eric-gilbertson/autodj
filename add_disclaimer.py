@@ -64,8 +64,9 @@ def insert_disclaimer(srcFile):
         cmd = cmd + '{}{}|{}{}.mp3'.format(sepChar, disclaimFile, TMP_PATH, i)
         sepChar = '|'
 
+    metaTitle = os.path.basename(srcFile)[0:-4]
     destFile = srcFile[0:-4] + '_disclaim.mp3'
-    cmd = cmd + '" -acodec copy "' + destFile + '"'
+    cmd = cmd + '" -acodec copy -metadata title="{}" "{}"'.format(metaTitle, destFile)
     if execute_ffmpeg_command(cmd) == 0:
         retFile = destFile
     elif os.path.exists(destFile):
