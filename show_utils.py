@@ -2,14 +2,19 @@ import os, random, datetime, urllib.request, json, glob, shutil, subprocess, get
 from random import randint
 
 IGNORE_SHOWS = {
+    '',
     'Chai Time',
+    'University Public Worship',
     'Palo Alto City Council',
 }
 
-STAGE_DIR = "/Users/Barbara/GoogleDrive/My Drive/show_uploads/"
+#STAGE_DIR = "/Users/Barbara/GoogleDrive/My Drive/show_uploads/"
+STAGE_DIR = "/Volumes/GoogleDrive/My Drive/show_uploads/"
+
 show_date = datetime.datetime.now()
 create_files = False
 
+# gaps are defined as [<START_HOUR>, <DURATION_HOURS>]
 TUESDAY_GAPS = [[6,4], [19,1], [22,1]]
 THURSDAY_GAPS= [[6,3], [11.5, 6.5], [7,1]]
 DAY_GAPS = {1:TUESDAY_GAPS, 3:THURSDAY_GAPS}
@@ -31,9 +36,9 @@ def parse_args(argv):
          is_today = False
          show_date = datetime.datetime.strptime(arg, "%Y-%m-%d")
       elif opt in ("-c", "--create_files"):
-         is_test = True
+         create_files = True
 
-   print ('Show date: {}'.format(show_date))
+   print ('Show date: {}, {}'.format(show_date, create_files))
 
 # return time length in seconds of an mp3 file using ffmpeg or -1 if invalid.
 # assumes user has ffmpeg in PATH.
@@ -45,7 +50,7 @@ def execute_ffmpeg_command(cmd):
     p_status = p.wait()
     err = str(err)
 
-    print("Execute: returned {}, {}".format(output, err))
+    #print("Execute: returned {}, {}".format(output, err))
     return p_status
 
 def get_mp3_duration(filePath):
@@ -56,7 +61,7 @@ def get_mp3_duration(filePath):
     p_status = p.wait()
     err = str(err)
 
-    print("Execute: {} returned {}, {}".format(cmd, output, err))
+    #print("Execute: {} returned {}, {}".format(cmd, output, err))
     if err.find("Duration:") > 0:
         time_str = err
         idx1 = time_str.index('Duration:') + 9
@@ -103,7 +108,7 @@ def add_disclaimer_and_copy(srcFile, destFile, durationMins):
     cmd = cmd + '" -acodec copy -t {} -metadata title="{}" "{}"'.format(durationMins*60, rootName, destFile)
     if execute_ffmpeg_command(cmd) == 0:
         retFile = destFile
-    elif os.path.exists(destPath):
+    elif os.path.exists(destFile):
         os.rename(destFile, destFile + ".bad")
 
     return retFile
@@ -124,6 +129,7 @@ def fill_gap(gap_datetime, gap_hours):
         if not showinfo or showinfo['attributes']['name'] in IGNORE_SHOWS:
             continue
 
+        show_name = showinfo['attributes']['name']
         glob_path = STAGE_DIR + gap_datetime.strftime("%Y-%m-%d_%H%M*.mp3")
         duration_minutes = 60 - gap_datetime.minute
         glob_ar = glob.glob(glob_path)
@@ -134,7 +140,7 @@ def fill_gap(gap_datetime, gap_hours):
             show_filename = os.path.basename(show_filepath)
             stage_filename = gap_datetime.strftime("%Y-%m-%d_%H%M") + "-{:02}00_{}".format(end_hour, show_filename)
             stage_filepath = STAGE_DIR + stage_filename
-            summary_msg = summary_msg + "Stage: {}, {}\n".format(show_filename, stage_filename)
+            summary_msg = summary_msg + "Stage: {}, {}, {}\n".format(show_filename, stage_filename, show_name[0:20])
             if create_files:
                 add_disclaimer_and_copy(show_filepath, stage_filepath, duration_minutes)
 
@@ -175,7 +181,8 @@ def get_show_info(showdate):
 # not safe harbor, early morning (usually Zootopia) or PACC.
 def is_safe_showdate(showdate, is_safeharbor):
     MONDAY_IDX = 0
-    isBad = showdate.hour > 1 and showdate.hour < 7 or \
+    hour = showdate.hour
+    isBad = hour > 1 and hour < 7 or \
             is_safeharbor == False and (hour >= 22 or hour < 6) or \
             showdate.weekday == MONDAY_IDX and hour >=  17
 
@@ -202,7 +209,7 @@ def get_show_file(safe_harbor):
         showfile = showdate.strftime('%Y/%b/%d/kzsu-%Y-%m-%d-%H00.mp3')
 
         hour = showdate.hour
-        if is_safe_showdate(shodate, safe_harbor):
+        if not is_safe_showdate(showdate, safe_harbor):
             continue
 
         file_path = FILE_ROOT + showfile
