@@ -112,11 +112,14 @@ def add_disclaimer_and_copy(srcFile, destFile, durationMins):
 def fill_gap(gap_datetime, gap_hours):
     show_files = []
     idx = 1000
+    summary_msg = ''
     while gap_hours > 0 and idx > 0:
         idx = idx - 1
         (showdate, show_filepath) = get_show_file(False)
-        showdate = datetime.datetime.strptime(show_filepath[-19:-4], "%Y-%m-%d-%H%M")
+        if show_filepath == None:
+            break
 
+        showdate = datetime.datetime.strptime(show_filepath[-19:-4], "%Y-%m-%d-%H%M")
         showinfo = get_show_info(showdate)
         if not showinfo or showinfo['attributes']['name'] in IGNORE_SHOWS:
             continue
@@ -125,21 +128,21 @@ def fill_gap(gap_datetime, gap_hours):
         duration_minutes = 60 - gap_datetime.minute
         glob_ar = glob.glob(glob_path)
         if len(glob_ar) > 0:
-            print("Skip gap hour, slot already filled. " + glob_ar[0])
+            summary_msg = summary_msg + "Slot filled: {} \n".format(glob_ar[0])
         else:
             end_hour = gap_datetime.hour + 1
             show_filename = os.path.basename(show_filepath)
-            stage_filepath = STAGE_DIR + gap_datetime.strftime("%Y-%m-%d_%H%M") + "-{:02}00_{}".format(end_hour, show_filename)
-            print("copy file to staging: {}, {}".format(show_filepath, stage_filepath))
+            stage_filename = gap_datetime.strftime("%Y-%m-%d_%H%M") + "-{:02}00_{}".format(end_hour, show_filename)
+            stage_filepath = STAGE_DIR + stage_filename
+            summary_msg = summary_msg + "Stage: {}, {}\n".format(show_filename, stage_filename)
             if create_files:
                 add_disclaimer_and_copy(show_filepath, stage_filepath, duration_minutes)
 
         gap_datetime = gap_datetime + datetime.timedelta(minutes=duration_minutes)
         gap_hours = gap_hours - duration_minutes/60.0
-        if gap_hours == 0:
-            return True
 
-    return False
+    print(summary_msg)
+    return gap_hours == 0
 
 
 def get_time_from_zookeeper(time_str):
@@ -167,6 +170,18 @@ def get_show_info(showdate):
 
     return None
 
+
+# return True if this is a good time for a potential source file, e.g.
+# not safe harbor, early morning (usually Zootopia) or PACC.
+def is_safe_showdate(showdate, is_safeharbor):
+    MONDAY_IDX = 0
+    isBad = showdate.hour > 1 and showdate.hour < 7 or \
+            is_safeharbor == False and (hour >= 22 or hour < 6) or \
+            showdate.weekday == MONDAY_IDX and hour >=  17
+
+    return isBad == False
+
+
 def random_datetime(start, end):
     rand_seconds = random.randint(0, int((end - start).total_seconds()))
     date = start + datetime.timedelta(seconds=rand_seconds)
@@ -177,8 +192,8 @@ def get_show_file(safe_harbor):
     start_date = datetime.datetime(2012, 2, 16)
     end_date = datetime.datetime.now() - datetime.timedelta(hours=24)
 
-
-    return (datetime.datetime(2022, 3, 3, 12), '/Users/Barbara/tmp/kzsu-archive/2022/Mar/03/kzsu-2022-03-03-1200.mp3')   #########
+    ######
+    #return (datetime.datetime(2022, 3, 3, 12), '/Users/Barbara/tmp/kzsu-archive/2022/Mar/03/kzsu-2022-03-03-1200.mp3')
 
     idx = 0
     while idx < 1000:
@@ -187,7 +202,7 @@ def get_show_file(safe_harbor):
         showfile = showdate.strftime('%Y/%b/%d/kzsu-%Y-%m-%d-%H00.mp3')
 
         hour = showdate.hour
-        if hour < 7 or not safe_harbor and hour >= 22:
+        if is_safe_showdate(shodate, safe_harbor):
             continue
 
         file_path = FILE_ROOT + showfile
