@@ -138,9 +138,10 @@ def fill_gap(gap_datetime, gap_hours):
         else:
             end_hour = gap_datetime.hour + 1
             show_filename = os.path.basename(show_filepath)
-            stage_filename = gap_datetime.strftime("%Y-%m-%d_%H%M") + "-{:02}00_{}".format(end_hour, show_filename)
+            stage_start = gap_datetime.strftime("%Y-%m-%d_%H%M")
+            stage_filename = stage_start + "-{:02}00_{}".format(end_hour, show_filename)
             stage_filepath = STAGE_DIR + stage_filename
-            summary_msg = summary_msg + "Stage: {}, {}, {}\n".format(show_filename, stage_filename, show_name[0:20])
+            summary_msg = summary_msg + "Stage: {}, {}, {}\n".format(show_filename, stage_start, show_name[0:30])
             if create_files:
                 add_disclaimer_and_copy(show_filepath, stage_filepath, duration_minutes)
 
