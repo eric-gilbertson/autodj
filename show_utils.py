@@ -1,11 +1,11 @@
 import os, random, datetime, urllib.request, json, glob, shutil, subprocess, getopt, sys
 from random import randint
 
-IGNORE_SHOWS = {
+# list of Zookeeper playlists that should not be rebroadcasted. note these names
+# may differ from the scheduled show name.
+ZOOKEEPER_IGNORE_PLAYLISTS = {
     '',
-    'Chai Time',
-    'University Public Worship',
-    'Palo Alto City Council',
+    'KZSU Time Traveler', # doesn't want his shows rebroadcasted
 }
 
 #STAGE_DIR = "/Users/Barbara/GoogleDrive/My Drive/show_uploads/"
@@ -44,7 +44,7 @@ def parse_args(argv):
 # assumes user has ffmpeg in PATH.
 def execute_ffmpeg_command(cmd):
     cmd = "/usr/local/bin/ffmpeg -hide_banner " + cmd
-    print("Execute: {}".format(cmd))
+    #print("Execute: {}".format(cmd))
     p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     (output, err) = p.communicate()
     p_status = p.wait()
@@ -113,6 +113,11 @@ def add_disclaimer_and_copy(srcFile, destFile, durationMins):
 
     return retFile
 
+# return pair of floats representing the show start & end times including minutes
+def get_show_hours_from_zookeeper(time_range):
+    start_hour = float(time_range[0:2]) + int(time_range[2:4])/60.0
+    end_hour = float(time_range[5:7]) + int(time_range[7:9])/60.0
+    return (start_hour, end_hour)
 
 def fill_gap(gap_datetime, gap_hours):
     show_files = []
@@ -124,24 +129,27 @@ def fill_gap(gap_datetime, gap_hours):
         if show_filepath == None:
             break
 
-        showdate = datetime.datetime.strptime(show_filepath[-19:-4], "%Y-%m-%d-%H%M")
+        showdate_str = show_filepath[-19:-4]
+        showdate = datetime.datetime.strptime(showdate_str, "%Y-%m-%d-%H%M")
         showinfo = get_show_info(showdate)
-        if not showinfo or showinfo['attributes']['name'] in IGNORE_SHOWS:
+        if not showinfo or showinfo['attributes']['name'] in ZOOKEEPER_IGNORE_PLAYLISTS:
             continue
 
-        show_name = showinfo['attributes']['name']
+        show_attributes = showinfo['attributes']
+        show_name = show_attributes['name']
+        show_shortname = show_name[0:20].strip()
         glob_path = STAGE_DIR + gap_datetime.strftime("%Y-%m-%d_%H%M*.mp3")
         duration_minutes = 60 - gap_datetime.minute
+        (show_starthour, show_endhour) = get_show_hours_from_zookeeper(show_attributes['time'])
         glob_ar = glob.glob(glob_path)
         if len(glob_ar) > 0:
             summary_msg = summary_msg + "Slot filled: {} \n".format(glob_ar[0])
         else:
             end_hour = gap_datetime.hour + 1
-            show_filename = os.path.basename(show_filepath)
             stage_start = gap_datetime.strftime("%Y-%m-%d_%H%M")
-            stage_filename = stage_start + "-{:02}00_{}".format(end_hour, show_filename)
+            stage_filename = stage_start + "-{:02}00_{}-{}.mp3".format(end_hour, show_shortname, showdate_str)
             stage_filepath = STAGE_DIR + stage_filename
-            summary_msg = summary_msg + "Stage: {}, {}, {}\n".format(show_filename, stage_start, show_name[0:30])
+            summary_msg = summary_msg + "Stage: {}, {}, {}\n".format(os.path.basename(show_filepath), stage_start, show_name)
             if create_files:
                 add_disclaimer_and_copy(show_filepath, stage_filepath, duration_minutes)
 
@@ -200,8 +208,8 @@ def get_show_file(safe_harbor):
     start_date = datetime.datetime(2012, 2, 16)
     end_date = datetime.datetime.now() - datetime.timedelta(hours=24)
 
-    ######
-    #return (datetime.datetime(2022, 3, 3, 12), '/Users/Barbara/tmp/kzsu-archive/2022/Mar/03/kzsu-2022-03-03-1200.mp3')
+    ###### TESTING ONLY #########
+    #return (datetime.datetime(2022, 3, 3, 13), '/Users/Barbara/tmp/kzsu-archive/2022/Mar/03/kzsu-2022-03-03-1300.mp3')
 
     idx = 0
     while idx < 1000:

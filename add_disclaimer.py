@@ -34,7 +34,7 @@ def get_mp3_duration(filePath):
     return (duration, is_44100Hz)
 
 
-def insert_disclaimer(srcFile):
+def insert_disclaimer(srcFile, fileDurationMins):
     retFile = None
     INSERT_GAP = 30*60 #seconds
     TMP_PATH = 'disclaimer_file'
@@ -66,7 +66,7 @@ def insert_disclaimer(srcFile):
 
     metaTitle = os.path.basename(srcFile)[0:-4]
     destFile = srcFile[0:-4] + '_disclaim.mp3'
-    cmd = cmd + '" -acodec copy -metadata title="{}" "{}"'.format(metaTitle, destFile)
+    cmd = cmd + '" -acodec copy -t {} -metadata title="{}" "{}"'.format(fileDurationMins*60, metaTitle, destFile)
     if execute_ffmpeg_command(cmd) == 0:
         retFile = destFile
     elif os.path.exists(destFile):
@@ -81,5 +81,5 @@ if __name__ == "__main__":
         print("Usage: ffmpeg_utils <FILE_NAME>")
     else:
         srcFile = sys.argv[1]
-        disclaimFile = insert_disclaimer(srcFile)
+        disclaimFile = insert_disclaimer(srcFile, 60)
         print("Result file : {}".format(disclaimFile))
