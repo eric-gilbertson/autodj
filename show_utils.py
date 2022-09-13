@@ -5,7 +5,13 @@ from random import randint
 # may differ from the scheduled show name.
 ZOOKEEPER_IGNORE_PLAYLISTS = {
     '',
+    'Radio Survivor',
+    'Zootopia',
+    'Laptop Radio',
+    'Time Traveler', # doesn't want his shows rebroadcasted
     'KZSU Time Traveler', # doesn't want his shows rebroadcasted
+    'Lift Jesus Higher Pt 2',
+    'ReJOYce in Jesus presents "Lift Jesus Higher!"'
 }
 
 #STAGE_DIR = "/Users/Barbara/GoogleDrive/My Drive/show_uploads/"
@@ -132,12 +138,14 @@ def fill_gap(gap_datetime, gap_hours):
         showdate_str = show_filepath[-19:-4]
         showdate = datetime.datetime.strptime(showdate_str, "%Y-%m-%d-%H%M")
         showinfo = get_show_info(showdate)
-        if not showinfo or showinfo['attributes']['name'] in ZOOKEEPER_IGNORE_PLAYLISTS:
+        showname = showinfo['attributes']['name'] if showinfo else ''
+        if showname in ZOOKEEPER_IGNORE_PLAYLISTS or showname.find('Rebroadcast') > 0:
+            if len(showname) > 0:
+                print("Skip show {}".format(showname))
             continue
 
         show_attributes = showinfo['attributes']
-        show_name = show_attributes['name']
-        show_shortname = show_name[0:20].strip()
+        show_shortname = showname[0:20].strip()
         glob_path = STAGE_DIR + gap_datetime.strftime("%Y-%m-%d_%H%M*.mp3")
         duration_minutes = 60 - gap_datetime.minute
         (show_starthour, show_endhour) = get_show_hours_from_zookeeper(show_attributes['time'])
@@ -149,7 +157,7 @@ def fill_gap(gap_datetime, gap_hours):
             stage_start = gap_datetime.strftime("%Y-%m-%d_%H%M")
             stage_filename = stage_start + "-{:02}00_{}-{}.mp3".format(end_hour, show_shortname, showdate_str)
             stage_filepath = STAGE_DIR + stage_filename
-            summary_msg = summary_msg + "Stage: {}, {}, {}\n".format(os.path.basename(show_filepath), stage_start, show_name)
+            summary_msg = summary_msg + "Stage: {}, {}, {}\n".format(os.path.basename(show_filepath), stage_start, showname)
             if create_files:
                 add_disclaimer_and_copy(show_filepath, stage_filepath, duration_minutes)
 
