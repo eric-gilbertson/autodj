@@ -80,7 +80,7 @@ def make_wav_file(audioFile):
 def eas_tone_check(audioFile, toneLengthSecs):
     TARGET_FREQ=1580
     GAP_MIN=21
-    GAP_MAX=31
+    GAP_MAX=25
     CHANNEL = 1
 
     wavFile = audioFile
@@ -104,6 +104,7 @@ def eas_tone_check(audioFile, toneLengthSecs):
     prevMinIdx = 0
     idx = -1
     hitCnt = 0
+    hitVal = 0
     while file.tell() < file.frames:
         pos = file.tell()
         block = file.read(1024*1024)
@@ -119,12 +120,23 @@ def eas_tone_check(audioFile, toneLengthSecs):
                 if GAP_MIN <= delta <= GAP_MAX:
                     #print("hit: {}, {}".format(sampleCnt, idx*samplePeriod))
                     hitCnt += 1
+                    hitVal +=  pair[CHANNEL]
                 else:
                     #print("reset sampleCnt {}, {}".format(delta, hitCnt))
                     hitCnt = 0
+                    hitVal = 0
 
                 if hitCnt > minHits:
-                    return idx * samplePeriod
+                    avgVal = hitVal / hitCnt
+                    #print("avg value: {}".format(avgVal))
+
+                    if avgVal >= 0.1:
+                        print("avg value: {}".format(avgVal))
+                        return idx * samplePeriod
+                    else:
+                        #print("avg value tooclows: {}".format(avgVal))
+                        hitCnt = 0
+                        hitVal = 0
 
                 prevMaxIdx = idx
                 isIncreasing = False
@@ -135,8 +147,8 @@ def eas_tone_check(audioFile, toneLengthSecs):
             prevVal = pair[CHANNEL]
             idx += 1
 
-    if deleteFile and wavFile != audioFile:
-        os.remove(wavFile)
+#    if deleteFile and wavFile != audioFile:
+#        os.remove(wavFile)
 
     #print("hits: {}, {}".format(hitCnt, idx))
     return -1
