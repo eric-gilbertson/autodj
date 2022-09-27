@@ -214,7 +214,7 @@ elif args.date:
     elif date_len == 3:
         process_day(int(date_ar[0]), int(date_ar[1]), int(date_ar[2]), -1)
 elif args.datetime:
-    date = datetime.datetime.strptime(args.datetime, '%Y-%m-%dT%H%M')
+    date = datetime.datetime.strptime(args.datetime, '%Y-%m-%d%H%M')
     process_day(date.year, date.month, date.day, date.hour)
 else:
     log_it("Invalid date: " + args.date)
