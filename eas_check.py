@@ -3,11 +3,11 @@
 
 """
 import argparse, time, math, os, subprocess, datetime, glob
+from calendar import monthrange
 import sounddevice as sd
 import soundfile as sf
 
-ARCHIVE_PATH = '/media/pr2100/kzsu-aircheck-archives'
-ARCHIVE_PATH = '/Users/Barbara/tmp/kzsu-archive' ##########
+ARCHIVE_PATH = '/Volumes/Public/kzsu-aircheck-archives'
 
 parser = argparse.ArgumentParser(add_help=False)
 parser.add_argument(
@@ -46,12 +46,13 @@ def get_src_files(year, month, day, hour):
     hour2d = make2digit(hour) + '00' if hour >= 0 else '*'
     filename = 'kzsu-{}-{}-{}-{}.mp3'.format(year, make2digit(month), make2digit(day), hour2d)
     path = '{}/{}/{}/{}/{}'.format(ARCHIVE_PATH, year,  months[month-1], make2digit(day), filename)
+    #print("path: " + path)
     files = glob.glob(path)
     return files
 
 def execute_ffmpeg_command(cmd):
     cmd = "/usr/local/bin/ffmpeg -hide_banner " + cmd
-    print("Execute: {}".format(cmd))
+    #print("Execute: {}".format(cmd))
     p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     (output, err) = p.communicate()
     p_status = p.wait()
@@ -139,7 +140,7 @@ def eas_tone_check(audioFile, toneLengthSecs):
     return -1
 
 def check_file(filePath):
-    print("check file: " + filePath)
+    #print("check file: " + filePath)
     easTimeSecs = eas_tone_check(filePath, .5)
 
     if easTimeSecs == 0:
@@ -149,14 +150,14 @@ def check_file(filePath):
                                                               math.floor(easTimeSecs / 60),
                                                               math.floor(easTimeSecs % 60)))
     else:
-        print("{}: okay".format(filePath))
+        print("{}: okay".format(os.path.basename(filePath)))
 
 def process_day(year, month, day, hour):
     log_it("Process day {}, {}, {}, {}".format(year, month, day, hour))
     files = get_src_files(year, month, day, hour)
 
     if len(files) == 0:
-        log_it("no files for: {}-{}-{}-{}".format(year, month, day, hour))
+        log_it("no files for: {}-{}-{}:{}".format(year, month, day, hour))
         return
     else:
         for file in files:
@@ -172,14 +173,14 @@ def process_month(year, month):
 def process_year(year):
     log_it("Process year {}".format(year))
     for month in range(12):
-        log_it("process month: " + month+1)
+        log_it("process month: {}".format(month+1))
         process_month(year, month+1)
 
 
 if args.filename:
     check_file(args.filename)
 elif args.date:
-    date_ar = start_date.split('-')
+    date_ar = args.date.split('-')
     date_len = len(date_ar)
 
     if date_len == 1:
@@ -187,11 +188,11 @@ elif args.date:
     elif date_len == 2:
         process_month(int(date_ar[0]), int(date_ar[1]))
     elif date_len == 3:
-        process_day(int(date_ar[0]), int(date_ar[1]), int(date_ar[2]))
+        process_day(int(date_ar[0]), int(date_ar[1]), int(date_ar[2]), -1)
 elif args.datetime:
     date = datetime.datetime.strptime(args.datetime, '%Y-%m-%dT%H%M')
     process_day(date.year, date.month, date.day, date.hour)
 else:
-    log_it("Invalid date: " + start_date)
+    log_it("Invalid date: " + args.date)
 
 
