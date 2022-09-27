@@ -8,6 +8,8 @@ import sounddevice as sd
 import soundfile as sf
 
 ARCHIVE_PATH = '/Volumes/Public/kzsu-aircheck-archives'
+ARCHIVE_PATH = '/media/pr2100/kzsu-aircheck-archives'
+
 
 parser = argparse.ArgumentParser(add_help=False)
 parser.add_argument(
@@ -63,6 +65,12 @@ def execute_ffmpeg_command(cmd):
 
     return p_status
 
+def save_tone_segment(srcPath, timeSecs):
+    fileName = os.path.basename(srcPath)
+    startSecs = max(0, timeSecs - 30)
+    outPath = '/tmp/eas_hit-{}-{:02d}{:02d}.wav'.format(fileName[0:-4], math.floor(timeSecs/60), math.floor(timeSecs %60))
+    cmd = '-y  -i "{}" -ss {} -to {} -c:a copy "{}"'.format(srcPath, startSecs, startSecs+60, outPath)
+    execute_ffmpeg_command(cmd)
 
 def make_wav_file(audioFile):
     retVal = None
@@ -132,6 +140,8 @@ def eas_tone_check(audioFile, toneLengthSecs):
 
                     if avgVal >= 0.1:
                         print("avg value: {}".format(avgVal))
+                        hitTime = idx * samplePeriod
+                        save_tone_segment(wavFile, hitTime)
                         return idx * samplePeriod
                     else:
                         #print("avg value tooclows: {}".format(avgVal))
