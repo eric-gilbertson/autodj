@@ -79,7 +79,7 @@ def make_wav_file(audioFile):
 # (in seconds) if found, else -1 or 0 if error
 def eas_tone_check(audioFile, toneLengthSecs):
     GAP_MIN=21
-    GAP_MAX=29
+    GAP_MAX=31
     CHANNEL = 1
 
     wavFile = audioFile
@@ -89,7 +89,7 @@ def eas_tone_check(audioFile, toneLengthSecs):
         deleteFile = True
 
     block, sampleRate = sf.read(wavFile)
-    if sampleRate != 44100:
+    if sampleRate != 44100 and sampleRate != 48000:
         print("Unsupported sample rate") # this probably works but haven't tested it
         return 0
 
@@ -114,6 +114,7 @@ def eas_tone_check(audioFile, toneLengthSecs):
             #print("compoare: {}, {}".format(prev0, pair[0]))
             if isIncreasing and prevVal > 0 and (pair[CHANNEL] < prevVal):
                 delta = idx - prevMaxIdx
+                #print("delta: {}".format(delta))
                 if GAP_MIN <= delta <= GAP_MAX:
                     #print("hit: {}, {}".format(sampleCnt, idx*samplePeriod))
                     hitCnt += 1
