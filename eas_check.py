@@ -78,6 +78,7 @@ def make_wav_file(audioFile):
 # check for a 1050Hz tone of toneLengthSecs and return the time point
 # (in seconds) if found, else -1 or 0 if error
 def eas_tone_check(audioFile, toneLengthSecs):
+    TARGET_FREQ=1580
     GAP_MIN=21
     GAP_MAX=31
     CHANNEL = 1
@@ -94,7 +95,7 @@ def eas_tone_check(audioFile, toneLengthSecs):
         return 0
 
     file = sf.SoundFile(wavFile, 'r')
-    minHits = sampleRate * toneLengthSecs / GAP_MIN
+    minHits = (sampleRate  * toneLengthSecs) / TARGET_FREQ
     samplePeriod = 1.0 / sampleRate
 
     isIncreasing = None
@@ -119,7 +120,7 @@ def eas_tone_check(audioFile, toneLengthSecs):
                     #print("hit: {}, {}".format(sampleCnt, idx*samplePeriod))
                     hitCnt += 1
                 else:
-                    #print("reset sampleCnt {}, {}".format(idx, idx * .00000227))
+                    #print("reset sampleCnt {}, {}".format(delta, hitCnt))
                     hitCnt = 0
 
                 if hitCnt > minHits:
