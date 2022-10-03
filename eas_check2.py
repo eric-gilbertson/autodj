@@ -108,11 +108,15 @@ def make_wav_file(audioFile):
 
     return retVal
 
+
 # check for a 1050Hz tone of toneLengthSecs and return the time point
 # (in seconds) if found, else -1 or 0 if error
 def eas_tone_check(audioFile, toneLengthSecs):
-    TONE_SPACING_MIN = 0.9
-    TONE_SPACING_MAX = 1.2
+    SILENCE_MIN = 0.9
+    SILENCE_MAX = 1.2
+    TONE_MIN = 0.8
+    TONE_MAX = 2.0
+    MSG_START_MAX_GAP = 10
 
     gaps = find_silence_gaps(audioFile)
     if len(gaps) == 0:
@@ -120,17 +124,29 @@ def eas_tone_check(audioFile, toneLengthSecs):
         return -1 # probably an error
 
     idx = 0;
-    while idx < len(gaps)-1:
+    prevGapAr = gaps[0]
+    prevToneLen = prevPrevTone = 12341431
+    prevPrevGapLen = prevGapLen = 13412343
+    for idx in range(len(gaps)):
         gapAr = gaps[idx]
-        nextGapAr = gaps[idx+1]
         #print("gap: {}, {}".format(gapAr[2], nextGapAr[2]))
-        toneLen = abs(nextGapAr[0] - gapAr[1])
-        if TONE_SPACING_MIN < gapAr[2] < TONE_SPACING_MAX and \
-           TONE_SPACING_MIN < nextGapAr[2] < TONE_SPACING_MAX:
-            hitTime = nextGapAr[0]
-            #print("hit: {}".format(idx, hitTime))
+        gapLen = gapAr[2]
+        toneLen = gapAr[0] - prevGapAr[1]
+        if SILENCE_MIN < gapLen < MSG_START_MAX_GAP and \
+           SILENCE_MIN < prevGapLen < SILENCE_MAX and \
+           SILENCE_MIN < prevPrevGapLen and \
+           TONE_MIN <= toneLen < TONE_MAX and \
+           TONE_MIN <= prevToneLen < TONE_MAX  and \
+           TONE_MIN <= prevPrevToneLen < TONE_MAX:
+            hitTime = gapAr[0]
+            #print("hit: {:02f}, {:02f}, {:02f}, {:02f}, {:02f}, {:02f}, {:02f}".format(prevPrevGapLen, prevPrevToneLen, prevGapLen, prevToneLen, toneLen, gapLen, hitTime))
             return hitTime
 
+        prevPrevToneLen = prevToneLen
+        prevToneLen = toneLen
+        prevPrevGapLen = prevGapLen
+        prevGapLen = gapLen
+        prevGapAr = gapAr
         idx += 1
 
     return -1
