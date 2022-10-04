@@ -111,17 +111,35 @@ def make_wav_file(audioFile):
 
 # check for a 1050Hz tone of toneLengthSecs and return the time point
 # (in seconds) if found, else -1 or 0 if error
-def eas_tone_check(audioFile, toneLengthSecs):
-    SILENCE_MIN = 0.9
-    SILENCE_MAX = 1.2
-    TONE_MIN = 0.8
-    TONE_MAX = 2.0
-    MSG_START_MAX_GAP = 10
-
+def eas_check(audioFile):
+    MAX_MSG_TIME = 120
     gaps = find_silence_gaps(audioFile)
     if len(gaps) == 0:
         log_it("No gaps: " + audioFile)
-        return -1 # probably an error
+        return (-1, -1) # probably an error
+
+    startToneTime = find_tone_burst(0, True, gaps)
+    if startToneTime > 0:
+        endToneTime = find_tone_burst(startToneTime, False, gaps)
+
+        if endToneTime > 0 and endToneTime - startToneTime <= MAX_MSG_TIME:
+            return (startToneTime, endToneTime)
+        else:
+            log_it("No end tone found.")
+
+    return (-1, -1)
+
+
+def find_tone_burst(startCheckTime, longBurst, gaps):
+    MSG_START_MAX_GAP = 10
+    SILENCE_MIN = 0.9
+    SILENCE_MAX = 1.2
+
+    TONE_MIN = 0.8
+    TONE_MAX = 2.0
+    if longBurst == False:
+        TONE_MIN = 0.2
+        TONE_MAX = 0.4
 
     idx = 0;
     prevGapAr = gaps[0]
@@ -129,6 +147,8 @@ def eas_tone_check(audioFile, toneLengthSecs):
     prevPrevGapLen = prevGapLen = 13412343
     for idx in range(len(gaps)):
         gapAr = gaps[idx]
+        if gapAr[0] < startCheckTime:
+            continue
         #print("gap: {}, {}".format(gapAr[2], nextGapAr[2]))
         gapLen = gapAr[2]
         toneLen = gapAr[0] - prevGapAr[1]
@@ -153,14 +173,14 @@ def eas_tone_check(audioFile, toneLengthSecs):
 
 def check_file(filePath):
     #print("check file: " + filePath)
-    easTimeSecs = eas_tone_check(filePath, .5)
+    (startTimeSecs, endTimeSecs) = eas_check(filePath)
 
-    if easTimeSecs == 0:
+    if startTimeSecs == 0:
         print("{}: check failed.".format(filePath))
-    elif easTimeSecs > 0:
-        print("{}: tone at {} seconds ({:02d}:{:02d})".format(filePath, math.floor(easTimeSecs),
-                                                              math.floor(easTimeSecs / 60),
-                                                              math.floor(easTimeSecs % 60)))
+    elif startTimeSecs > 0:
+        print("{}: tone at {}-{} seconds ({:02d}:{:02d})".format(filePath, math.floor(startTimeSecs), math.floor(endTimeSecs),
+                                                              math.floor(startTimeSecs / 60),
+                                                              math.floor(startTimeSecs % 60)))
     else:
         print("{}: okay".format(os.path.basename(filePath)))
 
