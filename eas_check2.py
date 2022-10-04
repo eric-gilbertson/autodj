@@ -8,7 +8,8 @@ import sounddevice as sd
 import soundfile as sf
 
 ARCHIVE_PATH = '/Volumes/Public/kzsu-aircheck-archives'
-ARCHIVE_PATH = '/media/pr2100/kzsu-aircheck-archives'
+#ARCHIVE_PATH = '/media/pr2100/kzsu-aircheck-archives'
+
 
 
 parser = argparse.ArgumentParser(add_help=False)
@@ -91,9 +92,10 @@ def find_silence_gaps(filePath):
 
 
 def save_tone_segment(srcPath, timeSecs):
-    fileName = os.path.basename(srcPath)
-    startSecs = max(0, timeSecs - 30)
-    outPath = '/tmp/eas_hit-{}-{:02d}{:02d}.wav'.format(fileName[0:-4], math.floor(timeSecs/60), math.floor(timeSecs %60))
+    notUsed, fileSuffix = os.path.splitext(srcPath)
+    fileName = os.path.basename(srcPath)[0:-4]
+    startSecs = max(0, timeSecs - 15)
+    outPath = '/tmp/eas_hit-{}-{:02d}{:02d}{}'.format(fileName, math.floor(timeSecs/60), math.floor(timeSecs %60), fileSuffix)
     cmd = '-y  -i "{}" -ss {} -to {} -c:a copy "{}"'.format(srcPath, startSecs, startSecs+60, outPath)
     execute_ffmpeg_command(cmd)
 
@@ -158,34 +160,35 @@ def check_file(filePath):
     if easTimeSecs == 0:
         print("{}: check failed.".format(filePath))
     elif easTimeSecs > 0:
-        print("{}: tone at {} seconds ({:02d}:{:02d})".format(filePath, math.floor(easTimeSecs),
+        save_tone_segment(filePath, easTimeSecs)
+        log_it("{}: tone at {} seconds ({:02d}:{:02d})".format(filePath, math.floor(easTimeSecs),
                                                               math.floor(easTimeSecs / 60),
                                                               math.floor(easTimeSecs % 60)))
     else:
-        print("{}: okay".format(os.path.basename(filePath)))
+        log_it("{}: okay".format(os.path.basename(filePath)))
 
 def process_day(year, month, day, hour):
-    log_it("Process day {}, {}, {}, {}".format(year, month, day, hour))
+    #log_it("Process day {}, {}, {}, {}".format(year, month, day, hour))
     files = get_src_files(year, month, day, hour)
 
     if len(files) == 0:
-        log_it("no files for: {}-{}-{}:{}".format(year, month, day, hour))
+        #log_it("no files for: {}-{}-{}:{}".format(year, month, day, hour))
         return
     else:
         for file in files:
             check_file(file)
 
 def process_month(year, month):
-    log_it("Process month {}, {}".format(year, month))
+    #log_it("Process month {}, {}".format(year, month))
     num_days = monthrange(year, month)[1]
     for day in range(num_days):
-        log_it('process day: ' + str(day+1))
+        #log_it('process day: ' + str(day+1))
         process_day(year, month, day+1, -1)
 
 def process_year(year):
-    log_it("Process year {}".format(year))
+    #log_it("Process year {}".format(year))
     for month in range(12):
-        log_it("process month: {}".format(month+1))
+        #log_it("process month: {}".format(month+1))
         process_month(year, month+1)
 
 
@@ -202,7 +205,7 @@ elif args.date:
     elif date_len == 3:
         process_day(int(date_ar[0]), int(date_ar[1]), int(date_ar[2]), -1)
 elif args.datetime:
-    date = datetime.datetime.strptime(args.datetime, '%Y-%m-%d%H%M')
+    date = datetime.datetime.strptime(args.datetime, '%Y-%m-%d-%H%M')
     process_day(date.year, date.month, date.day, date.hour)
 else:
     log_it("Invalid date: " + args.date)
