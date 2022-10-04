@@ -122,7 +122,7 @@ def eas_check(audioFile):
 
     startToneTime = find_tone_burst(0, True, gaps)
     if startToneTime > 0:
-        endToneTime = find_tone_burst(startToneTime, False, gaps)
+        endToneTime = find_tone_burst(startToneTime + 10, False, gaps)
 
         if endToneTime > 0 and endToneTime - startToneTime <= MAX_MSG_TIME:
             return (startToneTime, endToneTime)
@@ -141,7 +141,7 @@ def find_tone_burst(startCheckTime, longBurst, gaps):
     TONE_MAX = 2.0
     if longBurst == False:
         TONE_MIN = 0.2
-        TONE_MAX = 0.4
+        TONE_MAX = 0.5
 
     idx = 0;
     prevGapAr = gaps[0]
