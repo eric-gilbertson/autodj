@@ -123,11 +123,7 @@ def eas_check(audioFile):
     startToneTime = find_tone_burst(0, True, gaps)
     if startToneTime > 0:
         endToneTime = find_tone_burst(startToneTime + 10, False, gaps)
-
-        if endToneTime > 0 and endToneTime - startToneTime <= MAX_MSG_TIME:
-            return (startToneTime, endToneTime)
-        else:
-            log_it("No end tone found.")
+        return (startToneTime, endToneTime)
 
     return (-1, -1)
 
@@ -180,8 +176,11 @@ def check_file(filePath):
     if startTimeSecs == 0:
         print("{}: check failed.".format(filePath))
     elif startTimeSecs > 0:
-        save_tone_segment(filePath, startTimeSecs)
-        log_it("{}: tone at {}-{} seconds ({:02d}:{:02d})".format(filePath, math.floor(startTimeSecs), math.floor(endTimeSecs),
+        # don't save test files
+        if filePath.startswith(ARCHIVE_PATH):
+            save_tone_segment(filePath, startTimeSecs)
+
+        log_it("{}: tone at {}:{} seconds ({:02d}:{:02d})".format(filePath, math.floor(startTimeSecs), math.floor(endTimeSecs),
                                                               math.floor(startTimeSecs / 60),
                                                               math.floor(startTimeSecs % 60)))
     else:
