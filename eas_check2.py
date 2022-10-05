@@ -123,20 +123,25 @@ def make_wav_file(audioFile):
 # (in seconds) if found, else -1 or 0 if error
 def eas_check(audioFile):
     MAX_MSG_TIME = 120
-    (duration, gaps) = find_silence_gaps(audioFile)
+    (duration_secs, gaps) = find_silence_gaps(audioFile)
     if len(gaps) == 0:
         log_it("No gaps: " + audioFile)
         return (-1, -1) # probably an error
 
-    startToneTime = find_tone_burst(0, True, gaps)
+    startToneTime = find_tone_burst(0, True, gaps, duration_secs)
     if startToneTime > 0:
-        endToneTime = find_tone_burst(startToneTime + 10, False, gaps)
+        endToneTime = find_tone_burst(startToneTime + 10, False, gaps, duration_secs)
+
+        # save iff an hour file from the archive, e.g. not for test files
+        if audioFile.startswith(ARCHIVE_PATH) and duration_secs > 50*60:
+            save_tone_file(audioFile)
+
         return (startToneTime, endToneTime)
 
     return (-1, -1)
 
 
-def find_tone_burst(startCheckTime, longBurst, gaps):
+def find_tone_burst(startCheckTime, longBurst, gaps, duration_secs):
     MSG_START_MAX_GAP = 10
     SILENCE_MIN = 0.9
     SILENCE_MAX = 1.2
@@ -158,15 +163,16 @@ def find_tone_burst(startCheckTime, longBurst, gaps):
         #print("gap: {}, {}".format(gapAr[2], nextGapAr[2]))
         gapLen = gapAr[2]
         toneLen = gapAr[0] - prevGapAr[1]
-        if SILENCE_MIN < gapLen < MSG_START_MAX_GAP and \
+        atEnd = duration_secs - gapAr[0] < 5
+        if atEnd and TONE_MIN < toneLen < TONE_MAX and SILENCE_MIN <= gapLen <=SILENCE_MAX:
+            return gapAr[0]
+        elif SILENCE_MIN < gapLen < MSG_START_MAX_GAP and \
            SILENCE_MIN < prevGapLen < SILENCE_MAX and \
            SILENCE_MIN < prevPrevGapLen and \
            TONE_MIN <= toneLen < TONE_MAX and \
            TONE_MIN <= prevToneLen < TONE_MAX  and \
            TONE_MIN <= prevPrevToneLen < TONE_MAX:
-            hitTime = gapAr[0]
-            #print("hit: {:02f}, {:02f}, {:02f}, {:02f}, {:02f}, {:02f}, {:02f}".format(prevPrevGapLen, prevPrevToneLen, prevGapLen, prevToneLen, toneLen, gapLen, hitTime))
-            return hitTime
+            return gapAr[0]
 
         prevPrevToneLen = prevToneLen
         prevToneLen = toneLen
@@ -180,19 +186,16 @@ def find_tone_burst(startCheckTime, longBurst, gaps):
 def check_file(filePath):
     #print("check file: " + filePath)
     (startTimeSecs, endTimeSecs) = eas_check(filePath)
+    fileName = os.path.basename(filePath)
 
     if startTimeSecs == 0:
-        print("{}: check failed.".format(filePath))
+        print("{}: check failed.".format(fileName))
     elif startTimeSecs > 0:
-        # don't save test files
-        if filePath.startswith(ARCHIVE_PATH):
-            save_tone_segment(filePath, startTimeSecs)
-
-        log_it("{}: tone at {}:{} seconds ({:02d}:{:02d})".format(filePath, math.floor(startTimeSecs), math.floor(endTimeSecs),
+        log_it("{}: {} - {}: tone ({:02d}:{:02d})".format(fileName, math.floor(startTimeSecs), math.floor(endTimeSecs),
                                                               math.floor(startTimeSecs / 60),
                                                               math.floor(startTimeSecs % 60)))
     else:
-        log_it("{}: okay".format(os.path.basename(filePath)))
+        log_it("{}: okay".format(os.path.basename(fileName)))
 
 def process_day(year, month, day, hour):
     #log_it("Process day {}, {}, {}, {}".format(year, month, day, hour))
