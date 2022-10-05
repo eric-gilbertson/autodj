@@ -74,11 +74,19 @@ def find_silence_gaps(filePath):
     p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     (output, err) = p.communicate()
     p_status = p.wait()
-    result = str(err)
+    result = str(err, 'utf-8')
+
+    duration = -1
+    if result.find("Duration:") > 0:
+        idx1 = result.find('Duration:') + 9
+        idx2 = result.find(',', idx1)
+        time_str = result[idx1:idx2].strip()
+        time = datetime.datetime.strptime(time_str, '%H:%M:%S.%f')
+        duration = time.second + time.minute * 60 + time.hour * 3600
 
     silence_start_idx = result.find('silence_start: ') + 15
     while silence_start_idx > 15:
-        silence_start_idx2 = result.find('\\n', silence_start_idx)
+        silence_start_idx2 = result.find('\n', silence_start_idx)
         start_time = result[silence_start_idx:silence_start_idx2]
         start_time = float(start_time)
         silence_end_idx = result.find('silence_end: ', silence_start_idx) + 13
@@ -88,7 +96,7 @@ def find_silence_gaps(filePath):
         gaps.append([start_time, end_time, end_time - start_time])
         silence_start_idx = result.find('silence_start: ', silence_start_idx) + 15
 
-    return gaps
+    return (duration, gaps)
 
 
 def save_tone_segment(srcPath, timeSecs):
@@ -115,7 +123,7 @@ def make_wav_file(audioFile):
 # (in seconds) if found, else -1 or 0 if error
 def eas_check(audioFile):
     MAX_MSG_TIME = 120
-    gaps = find_silence_gaps(audioFile)
+    (duration, gaps) = find_silence_gaps(audioFile)
     if len(gaps) == 0:
         log_it("No gaps: " + audioFile)
         return (-1, -1) # probably an error
