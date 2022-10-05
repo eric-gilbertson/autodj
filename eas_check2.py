@@ -130,11 +130,11 @@ def eas_check(audioFile):
 
     startToneTime = find_tone_burst(0, True, gaps, duration_secs)
     if startToneTime > 0:
-        endToneTime = find_tone_burst(startToneTime + 10, False, gaps, duration_secs)
+        endToneTime = find_tone_burst(startToneTime, False, gaps, duration_secs)
 
         # save iff an hour file from the archive, e.g. not for test files
         if audioFile.startswith(ARCHIVE_PATH) and duration_secs > 50*60:
-            save_tone_file(audioFile)
+            save_tone_segment(audioFile, startToneTime)
 
         return (startToneTime, endToneTime)
 
@@ -191,9 +191,12 @@ def check_file(filePath):
     if startTimeSecs == 0:
         print("{}: check failed.".format(fileName))
     elif startTimeSecs > 0:
-        log_it("{}: {} - {}: tone ({:02d}:{:02d})".format(fileName, math.floor(startTimeSecs), math.floor(endTimeSecs),
-                                                              math.floor(startTimeSecs / 60),
-                                                              math.floor(startTimeSecs % 60)))
+        startTimeSecs -= 6 # adjust to start of burst
+        startMins = math.floor(startTimeSecs / 60)
+        startSecs = math.floor(startTimeSecs % 60)
+        endMins = math.floor(endTimeSecs / 60)
+        endSecs = math.floor(endTimeSecs % 60)
+        log_it("{}: {:02d}:{:02d} - {:02d}:{:02d} tone ({} - {})".format(fileName, startMins, startSecs, endMins, endSecs, math.floor(startTimeSecs), math.floor(endTimeSecs)))
     else:
         log_it("{}: okay".format(os.path.basename(fileName)))
 
