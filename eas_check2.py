@@ -194,6 +194,8 @@ def check_file(filePath):
         startTimeSecs -= 6 # adjust to start of burst
         startMins = math.floor(startTimeSecs / 60)
         startSecs = math.floor(startTimeSecs % 60)
+        # assume end of file if -1
+        endTimeSecs = endTimeSecs if endTimeSecs >= 0 else 3600
         endMins = math.floor(endTimeSecs / 60)
         endSecs = math.floor(endTimeSecs % 60)
         log_it("{}: {:02d}:{:02d} - {:02d}:{:02d} tone ({} - {})".format(fileName, startMins, startSecs, endMins, endSecs, math.floor(startTimeSecs), math.floor(endTimeSecs)))
