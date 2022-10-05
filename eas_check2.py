@@ -123,20 +123,24 @@ def make_wav_file(audioFile):
 # (in seconds) if found, else -1 or 0 if error
 def eas_check(audioFile):
     MAX_MSG_TIME = 120
-    (duration_secs, gaps) = find_silence_gaps(audioFile)
+    (durationSecs, gaps) = find_silence_gaps(audioFile)
     if len(gaps) == 0:
         log_it("No gaps: " + audioFile)
         return (-1, -1) # probably an error
 
-    startToneTime = find_tone_burst(0, True, gaps, duration_secs)
-    if startToneTime > 0:
-        endToneTime = find_tone_burst(startToneTime, False, gaps, duration_secs)
+    startToneTime = 0
+    while (startToneTime) >= 0:
+        startToneTime = find_tone_burst(startToneTime, True, gaps, durationSecs)
+        endToneTime = find_tone_burst(startToneTime, False, gaps, durationSecs)
 
-        # save iff an hour file from the archive, e.g. not for test files
-        if audioFile.startswith(ARCHIVE_PATH) and duration_secs > 50*60:
-            save_tone_segment(audioFile, startToneTime)
+        if (durationSecs - startToneTime < 60) or endToneTime > startToneTime:
+            # save iff an hour file from the archive, e.g. not for test files
+            if audioFile.startswith(ARCHIVE_PATH) and durationSecs > 50*60:
+                save_tone_segment(audioFile, startToneTime)
 
-        return (startToneTime, endToneTime)
+            return (startToneTime, endToneTime)
+        else:
+            log_it("False start hit at {}".format(startToneTime))
 
     return (-1, -1)
 
@@ -194,7 +198,7 @@ def check_file(filePath):
         startTimeSecs -= 6 # adjust to start of burst
         startMins = math.floor(startTimeSecs / 60)
         startSecs = math.floor(startTimeSecs % 60)
-        # assume end of file if -1
+        #assume end of file if -1
         endTimeSecs = endTimeSecs if endTimeSecs >= 0 else 3600
         endMins = math.floor(endTimeSecs / 60)
         endSecs = math.floor(endTimeSecs % 60)
