@@ -131,16 +131,19 @@ def eas_check(audioFile):
     startToneTime = 0
     while (startToneTime) >= 0:
         startToneTime = find_tone_burst(startToneTime, True, gaps, durationSecs)
-        endToneTime = find_tone_burst(startToneTime, False, gaps, durationSecs)
+        if startToneTime > 0:
+            endToneTime = find_tone_burst(startToneTime, False, gaps, durationSecs)
+            isFileEnd = durationSecs - startToneTime < 60
+            isTonePair = endToneTime > 0 and endToneTime - startToneTime < 120
 
-        if (durationSecs - startToneTime < 60) or endToneTime > startToneTime:
-            # save iff an hour file from the archive, e.g. not for test files
-            if audioFile.startswith(ARCHIVE_PATH) and durationSecs > 50*60:
-                save_tone_segment(audioFile, startToneTime)
+            if isFileEnd or isTonePair:
+                # save iff an hour file from the archive, e.g. not for test files
+                if audioFile.startswith(ARCHIVE_PATH) and durationSecs > 50*60:
+                    save_tone_segment(audioFile, startToneTime)
 
-            return (startToneTime, endToneTime)
-        else:
-            log_it("False start hit at {}".format(startToneTime))
+                return (startToneTime, endToneTime)
+            else:
+                log_it("False start hit at {}".format(startToneTime))
 
     return (-1, -1)
 
