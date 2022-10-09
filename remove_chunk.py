@@ -5,6 +5,15 @@
 #
 import os, subprocess, sys, datetime
 
+ARCHIVE_PATH = '/Volumes/Public/kzsu-aircheck-archives'
+#ARCHIVE_PATH = '/media/pr2100/kzsu-aircheck-archives'
+#ARCHIVE_PATH = '/Users/Barbara/tmp/kzsu-archive'
+
+CLEAN_SUFFIX = ".clean.mp3"
+
+def log_it(msg):
+   print(msg, flush=True)
+
 # return time length in seconds of an mp3 file using ffmpeg or -1 if invalid.
 # assumes user has ffmpeg in PATH.
 def execute_ffmpeg_command(cmd):
@@ -23,7 +32,7 @@ def execute_ffmpeg_command(cmd):
 def remove_chunk(srcFile, startTime, endTime):
     tmp1 = '/tmp/segment_extract1.mp3'
     tmp2 = '/tmp/segment_extract2.mp3'
-    outFile = srcFile[0:-4] + ".clean.mp3"
+    outFile = srcFile[0:-4] + CLEAN_SUFFIX
 
     if os.path.exists(outFile):
         os.remove(outFile)
@@ -49,11 +58,52 @@ def remove_chunk(srcFile, startTime, endTime):
     return outFile
 
 
+# reads from a file of format:
+# <YYYY-MM-DD>-<HH:00M>, <START_TIME> - <END-TIME>, .....
+#
+# and removes the specified time segment from the file outputting it
+# to <FILE_NAME>.clean.mp3. It then moves the original files into the
+# eas_shows archive dir if none exits and then moves the clean file into
+# the orginal name. to protect against possible errors the process is skipped
+# if the time range exceeds 120 seconds.
+def process_manifest(manifestFile):
+    months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+    with open(manifestFile) as file:
+        while (line := file.readline().rstrip()):
+            if line.startswith('#'):
+                continue
+
+            lineAr = line.split(',')
+            audioFileTime = lineAr[0]
+            timeAr = lineAr[1].split('-')
+            startTime = datetime.datetime.strptime(timeAr[0].strip(), '%M:%S')
+            endTime = datetime.datetime.strptime(timeAr[1].strip(), '%M:%S')
+            cleanGap = (endTime - startTime).total_seconds()
+            if cleanGap > 120 or cleanGap <= 10:
+                log_it('Skipping {} due to improper gap {}'.format(srcFile, cleanGap))
+                continue
+
+            dateAr = audioFileTime.split('-')
+            archiveFile = 'kzsu-{}.mp3'.format(audioFileTime)
+            srcPath = '{}/{}/{}/{}/{}'.format(ARCHIVE_PATH, dateAr[0], months[int(dateAr[1]) - 1], dateAr[2], archiveFile)
+            log_it("Clean it: {} - {}, {}".format(timeAr[0], timeAr[1], srcPath))
+            cleanPath = remove_chunk(srcPath, timeAr[0], timeAr[1])
+            if cleanPath:
+                savePath = '{}/eas_shows/{}'.format(ARCHIVE_PATH, archiveFile)
+                if not os.path.exists(savePath):
+                    os.rename(srcPath, savePath)
+                    
+                os.rename(cleanPath, srcPath)
+
+
+
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: remove_chunk <START_TIME> <END_TIME>  <FILE_NAME>")
-    else:
+    argCnt = len(sys.argv) - 1
+    if argCnt == 1:
+        process_manifest(sys.argv[1])
+    elif argCnt == 3:
         start = sys.argv[1]
         end = sys.argv[2]
         srcFile = sys.argv[3]
@@ -68,4 +118,7 @@ if __name__ == "__main__":
             else:
                 print("Error creating file")
                 sys.exit(1)
+    else:
+        print("Usage: remove_chunk [<MANIFEST_FILE> | <START_TIME> <END_TIME>  <FILE_NAME>")
+        sys.exit(1)
 
