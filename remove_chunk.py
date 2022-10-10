@@ -3,11 +3,11 @@
 # removes a chunk from an audio file between startTime and endTime and writes
 # it to <INPUT_FILE>.clean
 #
-import os, subprocess, sys, datetime
+import os, subprocess, sys, datetime, math, pathlib
 
 ARCHIVE_PATH = '/Volumes/Public/kzsu-aircheck-archives'
 #ARCHIVE_PATH = '/media/pr2100/kzsu-aircheck-archives'
-#ARCHIVE_PATH = '/Users/Barbara/tmp/kzsu-archive'
+ARCHIVE_PATH = '/Users/Barbara/tmp/kzsu-archive'
 
 CLEAN_SUFFIX = ".clean.mp3"
 
@@ -28,6 +28,25 @@ def execute_ffmpeg_command(cmd):
         print("Error execute: returned {}, {}".format(output, err))
 
     return p_status
+
+def save_audio_segment(srcPath, timeSecs):
+    fileName = os.path.basename(srcPath)
+    fileSuffix = pathlib.Path(fileName).suffix
+    startSecs = max(0, timeSecs - 15)
+    outPath = '/tmp/eas_clean-{}-{:02d}{:02d}{}'.format(fileName[0:-4], math.floor(timeSecs/60), math.floor(timeSecs %60), fileSuffix)
+    cmd = '-y  -i "{}" -ss {} -to {} -c:a copy "{}"'.format(srcPath, startSecs, startSecs+30, outPath)
+    execute_ffmpeg_command(cmd)
+
+def make_wav_file(audioFile):
+    retVal = None
+    wavFile = '/tmp/' + os.path.basename(audioFile)[0:-4] + '.wav'
+    cmd = '-y -i "{}" "{}"'.format(audioFile, wavFile)
+    if execute_ffmpeg_command(cmd) == 0:
+        retVal = wavFile
+    else:
+        print("Error creating wav file for: " + audioFile)
+
+    return retVal
 
 def remove_chunk(srcFile, startTime, endTime):
     tmp1 = '/tmp/segment_extract1.mp3'
@@ -95,6 +114,11 @@ def process_manifest(manifestFile):
                     os.rename(srcPath, savePath)
                     
                 os.rename(cleanPath, srcPath)
+                cutStartTimeAr = timeAr[0].split(':')
+                cutStartSeconds = int(cutStartTimeAr[0]) * 60 + int(cutStartTimeAr[1])
+                save_audio_segment(srcPath, cutStartSeconds)
+            else:
+                log_it("Error: extraction failed {}".format(srcPath))
 
 
 
