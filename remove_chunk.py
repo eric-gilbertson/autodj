@@ -7,7 +7,7 @@ import os, subprocess, sys, datetime, math, pathlib
 
 ARCHIVE_PATH = '/Volumes/Public/kzsu-aircheck-archives'
 #ARCHIVE_PATH = '/media/pr2100/kzsu-aircheck-archives'
-ARCHIVE_PATH = '/Users/Barbara/tmp/kzsu-archive'
+#ARCHIVE_PATH = '/Users/Barbara/tmp/kzsu-archive'
 
 CLEAN_SUFFIX = ".clean.mp3"
 
