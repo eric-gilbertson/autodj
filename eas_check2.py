@@ -102,6 +102,9 @@ def find_silence_gaps(filePath):
 def save_tone_segment(srcPath, timeSecs):
     notUsed, fileSuffix = os.path.splitext(srcPath)
     fileName = os.path.basename(srcPath)[0:-4]
+    if fileName.startswith('kzsu-'):
+        fileName = fileName[5:]
+
     startSecs = max(0, timeSecs - 15)
     outPath = '/tmp/eas_hit-{}-{:02d}{:02d}{}'.format(fileName, math.floor(timeSecs/60), math.floor(timeSecs %60), fileSuffix)
     cmd = '-y  -i "{}" -ss {} -to {} -c:a copy "{}"'.format(srcPath, startSecs, startSecs+60, outPath)
@@ -124,8 +127,9 @@ def make_wav_file(audioFile):
 def eas_check(audioFile):
     MAX_MSG_TIME = 120
     (durationSecs, gaps) = find_silence_gaps(audioFile)
+    fileName = os.path.basename(audioFile)
     if len(gaps) == 0:
-        log_it("No gaps: " + audioFile)
+        log_it("No gaps: " + fileName)
         return (-1, -1) # probably an error
 
     startToneTime = 0
@@ -142,8 +146,8 @@ def eas_check(audioFile):
                     save_tone_segment(audioFile, startToneTime)
 
                 return (startToneTime, endToneTime)
-            else:
-                log_it("False start hit at {}".format(startToneTime))
+            elif startToneTime > 0:
+                log_it("False start hit at {}, {}".format(startToneTime, fileName))
 
     return (-1, -1)
 
@@ -205,7 +209,7 @@ def check_file(filePath):
         endTimeSecs = endTimeSecs if endTimeSecs >= 0 else 3600
         endMins = math.floor(endTimeSecs / 60)
         endSecs = math.floor(endTimeSecs % 60)
-        log_it("{}: {:02d}:{:02d} - {:02d}:{:02d} tone ({} - {})".format(fileName, startMins, startSecs, endMins, endSecs, math.floor(startTimeSecs), math.floor(endTimeSecs)))
+        log_it("{}, {:02d}:{:02d} - {:02d}:{:02d}, tone ({:.1f})".format(fileName, startMins, startSecs, endMins, endSecs, endTimeSecs - startTimeSecs))
     else:
         log_it("{}: okay".format(os.path.basename(fileName)))
 
