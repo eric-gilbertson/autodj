@@ -122,9 +122,12 @@ def make_wav_file(audioFile):
     return retVal
 
 def seconds_to_time(seconds):
-    mins = math.floor(endTimeSecs / 60)
-    secs = math.floor(endTimeSecs % 60)
-    timeStr = '{:02d}:{:02d}'.format(min, secs)
+    timeStr = '-1:-1'
+    if seconds >= 0:
+        mins = math.floor(endTimeSecs / 60)
+        secs = math.floor(endTimeSecs % 60)
+        timeStr = '{:02d}:{:02d}'.format(min, secs)
+        
     return timeStr
 
 
@@ -135,7 +138,7 @@ def eas_check(audioFile):
     (durationSecs, gaps) = find_silence_gaps(audioFile)
     fileName = os.path.basename(audioFile)
     if len(gaps) == 0:
-        log_it("No gaps: " + fileName)
+        log_it("No gaps: {}, {}".format(durationSecs, fileName))
         return (-1, -1) # probably an error
 
     startToneStart = 0
@@ -153,7 +156,7 @@ def eas_check(audioFile):
 
                 return (startToneStart, endToneEnd)
             elif startToneTime > 0:
-                log_it("False start hit at {}, {}".format(startToneStart, fileName))
+                log_it("False start hit at {}, {}".format(seconds_to_time(startToneStart), fileName))
 
     return (-1, -1)
 
