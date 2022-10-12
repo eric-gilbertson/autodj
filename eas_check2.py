@@ -118,6 +118,12 @@ def make_wav_file(audioFile):
 
     return retVal
 
+def seconds_to_time(seconds):
+    mins = math.floor(endTimeSecs / 60)
+    secs = math.floor(endTimeSecs % 60)
+    timeStr = '{:02d}:{:02d}'.format(min, secs)
+    return timeStr
+
 
 # check for a 1050Hz tone of toneLengthSecs and return the time point
 # (in seconds) if found, else -1 or 0 if error
@@ -130,25 +136,25 @@ def eas_check(audioFile):
 
     startToneTime = 0
     while (startToneTime) >= 0:
-        startToneTime = find_tone_burst(startToneTime, True, gaps, durationSecs)
-        if startToneTime > 0:
-            endToneTime = find_tone_burst(startToneTime, False, gaps, durationSecs)
-            isFileEnd = durationSecs - startToneTime < 60
-            isTonePair = endToneTime > 0 and endToneTime - startToneTime < 120
+        (startToneStart, startToneEnd) = find_tone_burst(startToneTime, gaps, durationSecs)
+        if startToneStart > 0:
+            (endToneStart, endToneEnd) = find_tone_burst(startToneEnd, gaps, durationSecs)
+            isFileEnd = durationSecs - startToneStart < 60
+            isTonePair = endToneEnd > 0 and endToneEnd - startToneStart < 120
 
             if isFileEnd or isTonePair:
                 # save iff an hour file from the archive, e.g. not for test files
                 if audioFile.startswith(ARCHIVE_PATH) and durationSecs > 50*60:
-                    save_tone_segment(audioFile, startToneTime)
+                    save_tone_segment(audioFile, startToneStart)
 
-                return (startToneTime, endToneTime)
+                return (startToneStart, endToneEnd)
             else:
-                log_it("False start hit at {}".format(startToneTime))
+                log_it("False start hit at {}".format(seconds_to_time(startToneStart)))
 
     return (-1, -1)
 
 
-def find_tone_burst(startCheckTime, longBurst, gaps, duration_secs):
+def find_tone_burst(startCheckTime, gaps, duration_secs):
     TONE_END_MAX_GAP = 60
     SILENCE_MIN = 0.9
     SILENCE_MAX = 1.2
@@ -162,7 +168,9 @@ def find_tone_burst(startCheckTime, longBurst, gaps, duration_secs):
     idx = 0;
     prevGapAr = gaps[0]
     prevToneLen = prevPrevTone = 12341431
+    prevGapStart = prevPrevGapStart = prevPrevPrevGapStart = 3434234
     prevPrevGapLen = prevGapLen = 13412343
+    prevPrevGapEnd = prevGapEnd = 2341234
     for idx in range(len(gaps)):
         gapAr = gaps[idx]
         if gapAr[0] < startCheckTime:
@@ -172,40 +180,40 @@ def find_tone_burst(startCheckTime, longBurst, gaps, duration_secs):
         toneLen = gapAr[0] - prevGapAr[1]
         atEnd = duration_secs - gapAr[0] < 5
         if atEnd and TONE_MIN < toneLen < TONE_MAX and SILENCE_MIN <= gapLen <=SILENCE_MAX:
-            return gapAr[0]
+            return (gapAr[0], gapAr[1])
         elif SILENCE_MIN < gapLen < TONE_END_MAX_GAP and \
            SILENCE_MIN < prevGapLen < SILENCE_MAX and \
            SILENCE_MIN < prevPrevGapLen and \
            TONE_MIN <= toneLen < TONE_MAX and \
            TONE_MIN <= prevToneLen < TONE_MAX  and \
            TONE_MIN <= prevPrevToneLen < TONE_MAX:
-            return gapAr[0]
+            return (prevPrevPrevGapStart, gapAr[1])
 
+        prevPrevPrevGapStart = prevPrevGapStart
         prevPrevToneLen = prevToneLen
+        prevPrevGapStart = prevGapStart
         prevToneLen = toneLen
+        prevGapStart = gapAr[0]
         prevPrevGapLen = prevGapLen
         prevGapLen = gapLen
+        prevPrevGapEnd = prevGapEnd
+        prevGapEnd = prevGapAr[1]
         prevGapAr = gapAr
         idx += 1
 
-    return -1
+    return (-1, -1)
 
 def check_file(filePath):
     #print("check file: " + filePath)
-    (startTimeSecs, endTimeSecs) = eas_check(filePath)
+    (startToneStart, endToneEnd) = eas_check(filePath)
     fileName = os.path.basename(filePath)
 
-    if startTimeSecs == 0:
+    if startToneStart == 0:
         print("{}: check failed.".format(fileName))
-    elif startTimeSecs > 0:
-        startTimeSecs -= 6 # adjust to start of burst
-        startMins = math.floor(startTimeSecs / 60)
-        startSecs = math.floor(startTimeSecs % 60)
+    elif startToneStart > 0:
         #assume end of file if -1
-        endTimeSecs = endTimeSecs if endTimeSecs >= 0 else 3600
-        endMins = math.floor(endTimeSecs / 60)
-        endSecs = math.floor(endTimeSecs % 60)
-        log_it("{}: {:02d}:{:02d} - {:02d}:{:02d} tone ({} - {})".format(fileName, startMins, startSecs, endMins, endSecs, math.floor(startTimeSecs), math.floor(endTimeSecs)))
+        endToneEnd = endToneEnd if endToneEnd >= 0 else 3600 - 1
+        log_it("{}, {} - {}, tone ({:.1f})".format(fileName, startToneStart, endToneEnd, endToneEnd - startToneStart))
     else:
         log_it("{}: okay".format(os.path.basename(fileName)))
 
