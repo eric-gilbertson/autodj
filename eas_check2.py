@@ -124,9 +124,9 @@ def make_wav_file(audioFile):
 def seconds_to_time(seconds):
     timeStr = '-1:-1'
     if seconds >= 0:
-        mins = math.floor(endTimeSecs / 60)
-        secs = math.floor(endTimeSecs % 60)
-        timeStr = '{:02d}:{:02d}'.format(min, secs)
+        mins = math.floor(seconds / 60)
+        secs = math.floor(seconds % 60)
+        timeStr = "{:02d}:{:02d}".format(mins, secs)
         
     return timeStr
 
@@ -155,8 +155,10 @@ def eas_check(audioFile):
                     save_tone_segment(audioFile, startToneStart)
 
                 return (startToneStart, endToneEnd)
-            elif startToneTime > 0:
+            elif startToneStart > 0:
                 log_it("False start hit at {}, {}".format(seconds_to_time(startToneStart), fileName))
+
+            startToneStart = endToneEnd if endToneEnd > 0 else startToneStart + 3
 
     return (-1, -1)
 
@@ -220,7 +222,7 @@ def check_file(filePath):
     elif startToneStart > 0:
         #assume end of file if -1
         endToneEnd = endToneEnd if endToneEnd >= 0 else 3600 - 1
-        log_it("{}, {} - {}, tone ({:.1f})".format(fileName, startToneStart, endToneEnd, endToneEnd - startToneStart))
+        log_it("{}, {} - {}, tone ({:.1f})".format(fileName, seconds_to_time(startToneStart), seconds_to_time(endToneEnd), endToneEnd - startToneStart))
     else:
         log_it("{}: okay".format(os.path.basename(fileName)))
 
