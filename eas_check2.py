@@ -102,6 +102,9 @@ def find_silence_gaps(filePath):
 def save_tone_segment(srcPath, timeSecs):
     notUsed, fileSuffix = os.path.splitext(srcPath)
     fileName = os.path.basename(srcPath)[0:-4]
+    if fileName.startswith('kzsu-'):
+        fileName = fileName[5:]
+
     startSecs = max(0, timeSecs - 15)
     outPath = '/tmp/eas_hit-{}-{:02d}{:02d}{}'.format(fileName, math.floor(timeSecs/60), math.floor(timeSecs %60), fileSuffix)
     cmd = '-y  -i "{}" -ss {} -to {} -c:a copy "{}"'.format(srcPath, startSecs, startSecs+60, outPath)
@@ -130,17 +133,18 @@ def seconds_to_time(seconds):
 def eas_check(audioFile):
     MAX_MSG_TIME = 120
     (durationSecs, gaps) = find_silence_gaps(audioFile)
+    fileName = os.path.basename(audioFile)
     if len(gaps) == 0:
-        log_it("No gaps: " + audioFile)
+        log_it("No gaps: " + fileName)
         return (-1, -1) # probably an error
 
-    startToneTime = 0
-    while (startToneTime) >= 0:
-        (startToneStart, startToneEnd) = find_tone_burst(startToneTime, gaps, durationSecs)
+    startToneStart = 0
+    while (startToneStart) >= 0:
+        (startToneStart, startToneEnd) = find_tone_burst(startToneStart, gaps, durationSecs)
         if startToneStart > 0:
             (endToneStart, endToneEnd) = find_tone_burst(startToneEnd, gaps, durationSecs)
             isFileEnd = durationSecs - startToneStart < 60
-            isTonePair = endToneEnd > 0 and endToneEnd - startToneStart < 120
+            isTonePair = endToneEnd > 0 and endToneEnd - startToneStart < 180
 
             if isFileEnd or isTonePair:
                 # save iff an hour file from the archive, e.g. not for test files
@@ -148,8 +152,8 @@ def eas_check(audioFile):
                     save_tone_segment(audioFile, startToneStart)
 
                 return (startToneStart, endToneEnd)
-            else:
-                log_it("False start hit at {}".format(seconds_to_time(startToneStart)))
+            elif startToneTime > 0:
+                log_it("False start hit at {}, {}".format(startToneStart, fileName))
 
     return (-1, -1)
 
