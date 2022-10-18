@@ -1,18 +1,35 @@
+#!/bin/python3
+#
+# fills holes in program queue by filling the gaps with randomally selected
+# files from the program archive ignoring the files defined in 
+# ZOOKEEPER_IGNORE_PLAYLISTS. Also sanity check potential files for size and
+# silence gaps in order to eliminate corrupt and inappropriate files. 
+#
 import os, random, datetime, urllib.request, json, glob, shutil, subprocess, getopt, sys
 from random import randint
 
-# list of Zookeeper playlists that should not be rebroadcasted. note these names
-# may differ from the scheduled show name.
-ZOOKEEPER_IGNORE_PLAYLISTS = {
+# list of Zookeeper playlists that should not be rebroadcasted truncated to
+# 15 characters. note these names may differ from the scheduled show name.
+# NOTE: keys are truncated to 15 characters and set to lower case on startup.
+ZOOKEEPER_IGNORE_PLAYLISTS_SOURCE = [
     '',
-    'Radio Survivor',
     'Zootopia',
+    'Chaitime',
     'Laptop Radio',
-    'Time Traveler', # doesn't want his shows rebroadcasted
-    'KZSU Time Traveler', # doesn't want his shows rebroadcasted
-    'Lift Jesus Higher Pt 2',
-    'ReJOYce in Jesus presents "Lift Jesus Higher!"'
-}
+    'Time Traveler',
+    'Radio Survivor',
+    'KZSU Time Trave',
+    'LIVE!! KZSU Tim',
+    'University Publ',
+    'Philosophy Talk',
+    'Planetary Radio',
+    'NOT THE Palo Alto City Council',
+    'Viewer Discretion Advised',
+    'Commencement',
+]
+
+PLAYLIST_KEY_MAX_LEN=15
+ZOOKEEPER_IGNORE_PLAYLISTS = {}
 
 #STAGE_DIR = "/Users/Barbara/GoogleDrive/My Drive/show_uploads/"
 STAGE_DIR = "/Volumes/GoogleDrive/My Drive/show_uploads/"
@@ -21,8 +38,8 @@ show_date = datetime.datetime.now()
 create_files = False
 
 # gaps are defined as [<START_HOUR>, <DURATION_HOURS>]
-TUESDAY_GAPS = [[6,4], [19,1], [22,1]]
-THURSDAY_GAPS= [[6,3], [11.5, 6.5], [7,1]]
+TUESDAY_GAPS = [[6,4], [21,1]]
+THURSDAY_GAPS= [[6,3], [18, 2]]
 DAY_GAPS = {1:TUESDAY_GAPS, 3:THURSDAY_GAPS}
 
 def parse_args(argv):
@@ -139,7 +156,10 @@ def fill_gap(gap_datetime, gap_hours):
         showdate = datetime.datetime.strptime(showdate_str, "%Y-%m-%d-%H%M")
         showinfo = get_show_info(showdate)
         showname = showinfo['attributes']['name'] if showinfo else ''
-        if showname in ZOOKEEPER_IGNORE_PLAYLISTS or showname.find('Rebroadcast') > 0:
+
+        # use truncated compare becase names can have show specific suffixes.
+        shortname = showname[0:PLAYLIST_KEY_MAX_LEN]
+        if shortname.strip().lower() in ZOOKEEPER_IGNORE_PLAYLISTS or showname.lower().find('rebroadcast') >= 0 or showname.lower().find('jesus') >= 0:
             if len(showname) > 0:
                 print("Skip show {}".format(showname))
             continue
@@ -153,6 +173,12 @@ def fill_gap(gap_datetime, gap_hours):
         if len(glob_ar) > 0:
             summary_msg = summary_msg + "Slot filled: {} \n".format(glob_ar[0])
         else:
+            # this check is last because it is expensive
+            msg = check_audio_quality(show_filepath, 60)
+            if msg != 'ok':
+                print('Audio check error: {}, {}'.format(filepath, msg))
+                continue
+
             end_hour = gap_datetime.hour + 1
             stage_start = gap_datetime.strftime("%Y-%m-%d_%H%M")
             stage_filename = stage_start + "-{:02}00_{}-{}.mp3".format(end_hour, show_shortname, showdate_str)
@@ -211,6 +237,59 @@ def random_datetime(start, end):
     date = start + datetime.timedelta(seconds=rand_seconds)
     return date
 
+# return ok if file appears to be playable else a status string indicating the issues
+def check_audio_quality(filePath, expected_length_mins):
+    msg = ''
+    duration = -1
+    cmd = '/usr/local/bin/ffmpeg -hide_banner -i "{}"  -af silencedetect=n=-30dB:d=120.0 -f null -'.format(filePath)
+    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+    (output, err) = p.communicate()
+    p_status = p.wait()
+    result = str(err)
+
+    silence_start_idx = result.find('silence_start: ') + 15
+    msg_prefix = 'Has silence gap: '
+    while silence_start_idx > 15:
+        silence_start_idx2 = result.find('.', silence_start_idx)
+        start_time = result[silence_start_idx:silence_start_idx2]
+        start_time = int(start_time)
+        silence_end_idx = int(result.find('silence_end: ', silence_start_idx) + 13)
+        silence_end_idx2 = result.find('.', silence_end_idx)
+        end_time = result[silence_end_idx:silence_end_idx2]
+        end_time = int(end_time)
+        msg = msg + '{} {:02d}:{:02d}-{:02d}:{:02d}'.format(msg_prefix, start_time//60, start_time%60, end_time//60, end_time%60)
+        msg_prefix = ', '
+        silence_start_idx = result.find('silence_start: ', silence_start_idx) + 15
+
+    if len(msg) > 0:
+        msg = msg + '\n'
+
+
+    if result.find("Duration:") > 0:
+        idx1 = result.index('Duration:') + 9
+        idx2 = result.index(',', idx1)
+        time_str = result[idx1:idx2].strip()
+        time = datetime.datetime.strptime(time_str, '%H:%M:%S.%f')
+        seconds = time.second + time.minute * 60 + time.hour * 3600
+        if abs(seconds - expected_length_mins * 60) > 120:
+            msg = msg + 'Improper duration. '
+    else:
+        msg = msg + 'Unknown duration.'
+
+    return msg if len(msg) > 0 else 'ok'
+
+def is_valid_segment_file(filepath):
+   
+    if not os.path.exists(filepath):
+        return False
+
+    if os.path.getsize(filepath) < 40000000:
+        print("Too small: " + filepath)
+        return False
+
+    return True
+
+     
 def get_show_file(safe_harbor):
     FILE_ROOT = '/Volumes/Public/kzsu-aircheck-archives/'
     start_date = datetime.datetime(2012, 2, 16)
@@ -230,7 +309,7 @@ def get_show_file(safe_harbor):
             continue
 
         file_path = FILE_ROOT + showfile
-        if os.path.exists(file_path):
+        if is_valid_segment_file(file_path):
             return (showdate, file_path)
 
     return (None, None)
@@ -240,6 +319,13 @@ if __name__ == '__main__':
     gaps = 0
     weekday = show_date.weekday()
     gap_ar = DAY_GAPS.get(weekday, [])
+
+    # copy into new map the truncated keys so that we get those with
+    # suffix and spacing variations.
+    for key in ZOOKEEPER_IGNORE_PLAYLISTS_SOURCE:
+        newkey = key[0:PLAYLIST_KEY_MAX_LEN].strip().lower()
+        ZOOKEEPER_IGNORE_PLAYLISTS[newkey] = True
+
     for gap in gap_ar:
         gap_datetime = show_date + datetime.timedelta(hours=gap[0])
         fill_gap(gap_datetime, gap[1])
