@@ -1,4 +1,5 @@
 import os, random, datetime, urllib.request, json, glob, shutil, subprocess, getopt, sys
+import http.client
 from random import randint
 
 # list of Zookeeper playlists that should not be rebroadcasted. note these names
@@ -20,6 +21,24 @@ STAGE_DIR = "/Volumes/GoogleDrive/My Drive/show_uploads/"
 show_date = datetime.datetime.now()
 create_files = False
 
+def get_vault_shows(dateStr):
+    gaps = []
+    connection = http.client.HTTPConnection('kzsu.stanford.edu', timeout=2)
+    url = '/api/shows/bydate/{}/'.format(dateStr)
+    connection.request('GET', url)
+    respObj = json.load(connection.getresponse())
+    shows = respObj['day']['shows']
+    for show in shows:
+        if show['title'].lower() == 'from the vault':
+            kzsuStart = show['start_time']
+            startTime = float(kzsuStart[0:2]) + (float(kzsuStart[2:4]) / 60.0)
+            durationHours = int(show['duration']) / 60.0
+            gaps.append([startTime, durationHours])
+
+    print("Found {} vault shows for {}".format(len(gaps), dateStr))
+    return gaps
+
+        
 # gaps are defined as [<START_HOUR>, <DURATION_HOURS>]
 TUESDAY_GAPS = [[6,4], [19,1], [22,1]]
 THURSDAY_GAPS= [[6,3], [11.5, 6.5], [7,1]]
@@ -238,8 +257,9 @@ def get_show_file(safe_harbor):
 if __name__ == '__main__':
     parse_args(sys.argv[1:])
     gaps = 0
-    weekday = show_date.weekday()
-    gap_ar = DAY_GAPS.get(weekday, [])
+    #weekday = show_date.weekday()
+    #gap_ar = DAY_GAPS.get(weekday, [])
+    gap_ar = get_vault_shows(datetime.datetime.strftime(show_date, '%Y-%m-%d'))
     for gap in gap_ar:
         gap_datetime = show_date + datetime.timedelta(hours=gap[0])
         fill_gap(gap_datetime, gap[1])
