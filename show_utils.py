@@ -6,6 +6,7 @@
 # silence gaps in order to eliminate corrupt and inappropriate files. 
 #
 import os, random, datetime, urllib.request, json, glob, shutil, subprocess, getopt, sys
+import http.client
 from random import randint
 
 # list of Zookeeper playlists that should not be rebroadcasted truncated to
@@ -37,6 +38,24 @@ STAGE_DIR = "/Volumes/GoogleDrive/My Drive/show_uploads/"
 show_date = datetime.datetime.now()
 create_files = False
 
+def get_vault_shows(dateStr):
+    gaps = []
+    connection = http.client.HTTPConnection('kzsu.stanford.edu', timeout=2)
+    url = '/api/shows/bydate/{}/'.format(dateStr)
+    connection.request('GET', url)
+    respObj = json.load(connection.getresponse())
+    shows = respObj['day']['shows']
+    for show in shows:
+        if show['title'].lower() == 'from the vault':
+            kzsuStart = show['start_time']
+            startTime = float(kzsuStart[0:2]) + (float(kzsuStart[2:4]) / 60.0)
+            durationHours = int(show['duration']) / 60.0
+            gaps.append([startTime, durationHours])
+
+    print("Found {} vault shows for {}".format(len(gaps), dateStr))
+    return gaps
+
+        
 # gaps are defined as [<START_HOUR>, <DURATION_HOURS>]
 TUESDAY_GAPS = [[6,4], [21,1]]
 THURSDAY_GAPS= [[6,3], [18, 2]]
@@ -150,6 +169,7 @@ def fill_gap(gap_datetime, gap_hours):
         idx = idx - 1
         (showdate, show_filepath) = get_show_file(False)
         if show_filepath == None:
+            print("Error: no show files available.")
             break
 
         showdate_str = show_filepath[-19:-4]
@@ -318,13 +338,18 @@ if __name__ == '__main__':
     parse_args(sys.argv[1:])
     gaps = 0
     weekday = show_date.weekday()
-    gap_ar = DAY_GAPS.get(weekday, [])
 
     # copy into new map the truncated keys so that we get those with
     # suffix and spacing variations.
     for key in ZOOKEEPER_IGNORE_PLAYLISTS_SOURCE:
         newkey = key[0:PLAYLIST_KEY_MAX_LEN].strip().lower()
         ZOOKEEPER_IGNORE_PLAYLISTS[newkey] = True
+
+    show_date_str = datetime.datetime.strftime(show_date, '%Y-%m-%d')
+    gap_ar = get_vault_shows(show_date_str)
+    if len(gap_ar) == 0:
+        print('No vault gaps for: ' + show_date_str)
+        sys.exit(0)
 
     for gap in gap_ar:
         gap_datetime = show_date + datetime.timedelta(hours=gap[0])
