@@ -1,4 +1,4 @@
-import os, subprocess, sys, datetime
+import os, subprocess, sys, datetime, math
 
 # return time length in seconds of an mp3 file using ffmpeg or -1 if invalid.
 # assumes user has ffmpeg in PATH.
@@ -10,7 +10,7 @@ def execute_ffmpeg_command(cmd):
     p_status = p.wait()
     err = str(err)
 
-    print("Execute: returned {}, {}".format(output, err))
+    #print("Execute: returned {}, {}".format(output, err))
     return p_status
 
 def get_mp3_duration(filePath):
@@ -34,20 +34,32 @@ def get_mp3_duration(filePath):
     return (duration, is_44100Hz)
 
 
-def insert_disclaimer(srcFile, fileDurationMins):
+# splits file into chunks and then cat's it back together with a disclaimer between each
+# chunk and fade out last 10 seconds.
+def insert_disclaimer(srcFile):
     retFile = None
-    INSERT_GAP = 30*60 #seconds
+    FADE_SECONDS=10
+    DISCLAIM_GAP_MINS = 30
     TMP_PATH = 'disclaimer_file'
     retFile = None
-    (durationSeconds, is44100Hz) = get_mp3_duration(srcFile)
+    (srcFileSeconds, is44100Hz) = get_mp3_duration(srcFile)
+    durationSeconds = srcFileSeconds
+    disclaimFile = 'disclaimer44100.mp3' if is44100Hz else 'disclaimer48000.mp3'
+    (disclaimerSeconds, is44100Hz) = get_mp3_duration(disclaimFile)
+    disclaimerCnt = math.floor(durationSeconds / (DISCLAIM_GAP_MINS * 60))
+    durationSeconds -= disclaimerCnt * disclaimerSeconds
 
     if durationSeconds < 0:
         return retFile    
 
     startTime = 0
     fileCnt = 0
+    # split source file into chunks. make the last one FADE_SECONDS long so that i can be faded quickly.
     while startTime < durationSeconds:
-        endTime = startTime + min(INSERT_GAP, durationSeconds - startTime)
+        endTime = startTime + min(DISCLAIM_GAP_MINS*60, durationSeconds - startTime)
+        if endTime == durationSeconds and endTime - startTime > FADE_SECONDS:
+            endTime -= FADE_SECONDS
+
         tmpFile = TMP_PATH + str(fileCnt) + '.mp3'
         cmd = '-y  -i "{}" -ss {} -to {} -c:a copy {}'.format(srcFile, startTime, endTime, tmpFile)
         if execute_ffmpeg_command(cmd) != 0:
@@ -57,16 +69,29 @@ def insert_disclaimer(srcFile, fileDurationMins):
         fileCnt = fileCnt + 1
 
 
+    # add fade to the last segment
+    fadeSrcFile = '{}{}.mp3'.format(TMP_PATH, fileCnt - 1)
+    fadeDestFile = TMP_PATH + 'fadeout.mp3'
+    cmd = '-y -i {} -af "afade=t=out:st={}:d={}" {}'.format(fadeSrcFile, 0, FADE_SECONDS, fadeDestFile)
+    if execute_ffmpeg_command(cmd) != 0:
+        return None
+
+    os.rename(fadeDestFile, fadeSrcFile)
+
+
     cmd = '-y -i "concat:'
     sepChar = ''
-    disclaimFile = 'disclaimer44100.mp3' if is44100Hz else 'disclaimer48000.mp3'
     for i in range(fileCnt):
-        cmd = cmd + '{}{}|{}{}.mp3'.format(sepChar, disclaimFile, TMP_PATH, i)
+        if i == fileCnt - 1:
+            cmd = cmd + '|{}{}.mp3'.format(TMP_PATH, i)
+        else:
+            cmd = cmd + '{}{}|{}{}.mp3'.format(sepChar, disclaimFile, TMP_PATH, i)
+
         sepChar = '|'
 
     metaTitle = os.path.basename(srcFile)[0:-4]
     destFile = srcFile[0:-4] + '_disclaim.mp3'
-    cmd = cmd + '" -acodec copy -t {} -metadata title="{}" "{}"'.format(fileDurationMins*60, metaTitle, destFile)
+    cmd = cmd + '" -acodec copy -t {} -metadata title="{}" "{}"'.format(srcFileSeconds, metaTitle, destFile)
     if execute_ffmpeg_command(cmd) == 0:
         retFile = destFile
     elif os.path.exists(destFile):
@@ -78,8 +103,8 @@ def insert_disclaimer(srcFile, fileDurationMins):
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: ffmpeg_utils <FILE_NAME>")
+        print("Usage: {} <FILE_NAME>".format(sys.arvv[0]))
     else:
         srcFile = sys.argv[1]
-        disclaimFile = insert_disclaimer(srcFile, 60)
+        disclaimFile = insert_disclaimer(srcFile)
         print("Result file : {}".format(disclaimFile))
