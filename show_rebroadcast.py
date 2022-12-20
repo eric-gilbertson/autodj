@@ -8,12 +8,14 @@
 import os, random, datetime, urllib.request, json, glob, shutil, subprocess, getopt, sys
 import http.client
 from random import randint
+from add_disclaimer import insert_disclaimer
 
 # list of Zookeeper playlists that should not be rebroadcasted truncated to
 # 15 characters. note these names may differ from the scheduled show name.
 # NOTE: keys are truncated to 15 characters and set to lower case on startup.
 ZOOKEEPER_IGNORE_PLAYLISTS_SOURCE = [
     '',
+    'MHz',
     'Zootopia',
     'Chaitime',
     'Laptop Radio',
@@ -21,6 +23,7 @@ ZOOKEEPER_IGNORE_PLAYLISTS_SOURCE = [
     'Radio Survivor',
     'KZSU Time Trave',
     'LIVE!! KZSU Tim',
+    'Urban Innercity',
     'University Publ',
     'Philosophy Talk',
     'Planetary Radio',
@@ -29,6 +32,7 @@ ZOOKEEPER_IGNORE_PLAYLISTS_SOURCE = [
     'Commencement',
 ]
 
+SHOW_CACHE = {}
 PLAYLIST_KEY_MAX_LEN=15
 ZOOKEEPER_IGNORE_PLAYLISTS = {}
 
@@ -46,7 +50,7 @@ def get_vault_shows(dateStr):
     respObj = json.load(connection.getresponse())
     shows = respObj['day']['shows']
     for show in shows:
-        if show['title'].lower() == 'from the vault':
+        if show['title'].lower() == 'from the vault' or show['needs_sub']:
             kzsuStart = show['start_time']
             startTime = float(kzsuStart[0:2]) + (float(kzsuStart[2:4]) / 60.0)
             durationHours = int(show['duration']) / 60.0
@@ -67,12 +71,12 @@ def parse_args(argv):
    try:
       opts, args = getopt.getopt(argv,"d:c:",["date", "create-files"])
    except getopt.GetoptError:
-      print ('test.py -d YYYY-MM-DD')
+      print ('Parse error: usage {} -d YYYY-MM-DD'.format(argv[0]))
       sys.exit(2)
 
    for opt, arg in opts:
       if opt == '-h':
-         print ('test.py -date YYYY-MM-DD')
+         print (argv[0] + ' -date YYYY-MM-DD')
          sys.exit()
       elif opt in ("-d", "--date"):
          is_today = False
@@ -80,7 +84,7 @@ def parse_args(argv):
       elif opt in ("-c", "--create_files"):
          create_files = True
 
-   print ('Show date: {}, {}'.format(show_date, create_files))
+   #print ('Show date: {}, {}'.format(show_date, create_files))
 
 # return time length in seconds of an mp3 file using ffmpeg or -1 if invalid.
 # assumes user has ffmpeg in PATH.
@@ -116,44 +120,44 @@ def get_mp3_duration(filePath):
     return (duration, is_44100Hz)
 
 
-def add_disclaimer_and_copy(srcFile, destFile, durationMins):
-    retFile = None
-    INSERT_GAP = 30*60 #seconds
-    TMP_PATH = 'disclaimer_file'
-    retFile = None
-    (durationSeconds, is44100Hz) = get_mp3_duration(srcFile)
-
-    if durationSeconds < 0:
-        return retFile
-
-    startTime = 0
-    fileCnt = 0
-    while startTime < durationSeconds:
-        endTime = startTime + min(INSERT_GAP, durationSeconds - startTime)
-        tmpFile = TMP_PATH + str(fileCnt) + '.mp3'
-        cmd = '-y  -i "{}" -ss {} -to {} -c:a copy {}'.format(srcFile, startTime, endTime, tmpFile)
-        if execute_ffmpeg_command(cmd) != 0:
-            return None
-
-        startTime = endTime
-        fileCnt = fileCnt + 1
-
-
-    cmd = '-y -i "concat:'
-    sepChar = ''
-    disclaimFile = 'disclaimer44100.mp3' if is44100Hz else 'disclaimer48000.mp3'
-    for i in range(fileCnt):
-        cmd = cmd + '{}{}|{}{}.mp3'.format(sepChar, disclaimFile, TMP_PATH, i)
-        sepChar = '|'
-
-    rootName = os.path.basename(srcFile)[0:-4]
-    cmd = cmd + '" -acodec copy -t {} -metadata title="{}" "{}"'.format(durationMins*60, rootName, destFile)
-    if execute_ffmpeg_command(cmd) == 0:
-        retFile = destFile
-    elif os.path.exists(destFile):
-        os.rename(destFile, destFile + ".bad")
-
-    return retFile
+#def add_disclaimer_and_copy(srcFile, destFile, durationMins):
+#    retFile = None
+#    INSERT_GAP = 30*60 #seconds
+#    TMP_PATH = 'disclaimer_file'
+#    retFile = None
+#    (durationSeconds, is44100Hz) = get_mp3_duration(srcFile)
+#
+#    if durationSeconds < 0:
+#        return retFile
+#
+#    startTime = 0
+#    fileCnt = 0
+#    while startTime < durationSeconds:
+#        endTime = startTime + min(INSERT_GAP, durationSeconds - startTime)
+#        tmpFile = TMP_PATH + str(fileCnt) + '.mp3'
+#        cmd = '-y  -i "{}" -ss {} -to {} -c:a copy {}'.format(srcFile, startTime, endTime, tmpFile)
+#        if execute_ffmpeg_command(cmd) != 0:
+#            return None
+#
+#        startTime = endTime
+#        fileCnt = fileCnt + 1
+#
+#
+#    cmd = '-y -i "concat:'
+#    sepChar = ''
+#    disclaimFile = 'disclaimer44100.mp3' if is44100Hz else 'disclaimer48000.mp3'
+#    for i in range(fileCnt):
+#        cmd = cmd + '{}{}|{}{}.mp3'.format(sepChar, disclaimFile, TMP_PATH, i)
+#        sepChar = '|'
+#
+#    rootName = os.path.basename(srcFile)[0:-4]
+#    cmd = cmd + '" -acodec copy -t {} -metadata title="{}" "{}"'.format(durationMins*60, rootName, destFile)
+#    if execute_ffmpeg_command(cmd) == 0:
+#        retFile = destFile
+#    elif os.path.exists(destFile):
+#        os.rename(destFile, destFile + ".bad")
+#
+#    return retFile
 
 # return pair of floats representing the show start & end times including minutes
 def get_show_hours_from_zookeeper(time_range):
@@ -178,12 +182,14 @@ def fill_gap(gap_datetime, gap_hours):
         showname = showinfo['attributes']['name'] if showinfo else ''
 
         # use truncated compare becase names can have show specific suffixes.
-        shortname = showname[0:PLAYLIST_KEY_MAX_LEN]
-        if shortname.strip().lower() in ZOOKEEPER_IGNORE_PLAYLISTS or showname.lower().find('rebroadcast') >= 0 or showname.lower().find('jesus') >= 0:
+        shortname = showname[0:PLAYLIST_KEY_MAX_LEN].strip().lower()
+        if shortname in ZOOKEEPER_IGNORE_PLAYLISTS or showname.lower().find('rebroadcast') >= 0 or showname.lower().find('jesus') >= 0 or shortname in SHOW_CACHE:
             if len(showname) > 0:
                 print("Skip show {}".format(showname))
+
             continue
 
+        SHOW_CACHE[shortname] = True
         show_attributes = showinfo['attributes']
         show_shortname = showname[0:20].strip()
         glob_path = STAGE_DIR + gap_datetime.strftime("%Y-%m-%d_%H%M*.mp3")
@@ -205,7 +211,7 @@ def fill_gap(gap_datetime, gap_hours):
             stage_filepath = STAGE_DIR + stage_filename
             summary_msg = summary_msg + "Stage: {}, {}, {}\n".format(os.path.basename(show_filepath), stage_start, showname)
             if create_files:
-                add_disclaimer_and_copy(show_filepath, stage_filepath, duration_minutes)
+                insert_disclaimer(show_filepath, stage_filepath)
 
         gap_datetime = gap_datetime + datetime.timedelta(minutes=duration_minutes)
         gap_hours = gap_hours - duration_minutes/60.0
@@ -336,6 +342,10 @@ def get_show_file(safe_harbor):
 
 if __name__ == '__main__':
     parse_args(sys.argv[1:])
+    if len(sys.argv) < 2:
+        print('Usage {} -d YYYY-MM-DD -c [True|False]'.format(sys.argv[0]))
+        sys.exit(0)
+
     gaps = 0
     weekday = show_date.weekday()
 

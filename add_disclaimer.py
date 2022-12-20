@@ -4,7 +4,7 @@ import os, subprocess, sys, datetime, math
 # assumes user has ffmpeg in PATH.
 def execute_ffmpeg_command(cmd):
     cmd = "/usr/local/bin/ffmpeg -hide_banner " + cmd
-    print("Execute: {}".format(cmd))
+    #print("Execute: {}".format(cmd))
     p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     (output, err) = p.communicate()
     p_status = p.wait()
@@ -21,7 +21,7 @@ def get_mp3_duration(filePath):
     p_status = p.wait()
     err = str(err)
 
-    print("Execute: {} returned {}, {}".format(cmd, output, err))
+    #print("Execute: {} returned {}, {}".format(cmd, output, err))
     if err.find("Duration:") > 0:
         time_str = err
         idx1 = time_str.index('Duration:') + 9
@@ -36,7 +36,7 @@ def get_mp3_duration(filePath):
 
 # splits file into chunks and then cat's it back together with a disclaimer between each
 # chunk and fade out last 10 seconds.
-def insert_disclaimer(srcFile):
+def insert_disclaimer(srcFile, destFile):
     retFile = None
     FADE_SECONDS=10
     DISCLAIM_GAP_MINS = 30
@@ -90,7 +90,6 @@ def insert_disclaimer(srcFile):
         sepChar = '|'
 
     metaTitle = os.path.basename(srcFile)[0:-4]
-    destFile = srcFile[0:-4] + '_disclaim.mp3'
     cmd = cmd + '" -acodec copy -t {} -metadata title="{}" "{}"'.format(srcFileSeconds, metaTitle, destFile)
     if execute_ffmpeg_command(cmd) == 0:
         retFile = destFile
@@ -106,5 +105,6 @@ if __name__ == "__main__":
         print("Usage: {} <FILE_NAME>".format(sys.arvv[0]))
     else:
         srcFile = sys.argv[1]
-        disclaimFile = insert_disclaimer(srcFile)
+        disclaimFile = srcFile[0:-4] + '_disclaim.mp3'
+        insert_disclaimer(srcFile, disclaimFile)
         print("Result file : {}".format(disclaimFile))
