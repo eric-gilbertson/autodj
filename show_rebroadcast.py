@@ -1,4 +1,4 @@
-#!/bin/python3
+#!/usr/bin/python3
 #
 # fills holes in program queue by filling the gaps with randomally selected
 # files from the program archive ignoring the files defined in 
@@ -10,20 +10,28 @@ import http.client
 from random import randint
 from add_disclaimer import insert_disclaimer
 
+# TODO:
+# don't give given DJ more than one show
+# check that PL runs full hour
+
 # list of Zookeeper playlists that should not be rebroadcasted truncated to
 # 15 characters. note these names may differ from the scheduled show name.
 # NOTE: keys are truncated to 15 characters and set to lower case on startup.
 ZOOKEEPER_IGNORE_PLAYLISTS_SOURCE = [
     '',
     'MHz',
+    'MHz broadcast',
+    'MHz presents ',
     'Zootopia',
     'Chaitime',
+    'Blues With a feeling',
     'Laptop Radio',
     'Time Traveler',
     'Radio Survivor',
     'KZSU Time Trave',
     'LIVE!! KZSU Tim',
     'Urban Innercity',
+    'The Urban Innercity',
     'University Publ',
     'Philosophy Talk',
     'Planetary Radio',
@@ -32,6 +40,14 @@ ZOOKEEPER_IGNORE_PLAYLISTS_SOURCE = [
     'Commencement',
 ]
 
+ZOOKEEPER_IGNORE_AIRNAMES = [
+    'Francis D', # doesn't want to be rebroadcasted
+    'LJH Collage Crew',
+    'Raymundo',  # FCCs
+    'M-SMOOTH',   # FCCs
+]
+
+DJ_CACHE = {}
 SHOW_CACHE = {}
 PLAYLIST_KEY_MAX_LEN=15
 ZOOKEEPER_IGNORE_PLAYLISTS = {}
@@ -180,10 +196,11 @@ def fill_gap(gap_datetime, gap_hours):
         showdate = datetime.datetime.strptime(showdate_str, "%Y-%m-%d-%H%M")
         showinfo = get_show_info(showdate)
         showname = showinfo['attributes']['name'] if showinfo else ''
+        airname = showinfo['attributes']['airname'] if showinfo else ''
 
         # use truncated compare becase names can have show specific suffixes.
         shortname = showname[0:PLAYLIST_KEY_MAX_LEN].strip().lower()
-        if shortname in ZOOKEEPER_IGNORE_PLAYLISTS or showname.lower().find('rebroadcast') >= 0 or showname.lower().find('jesus') >= 0 or shortname in SHOW_CACHE:
+        if shortname in ZOOKEEPER_IGNORE_PLAYLISTS or showname.lower().find('rebroadcast') >= 0 or airname in ZOOKEEPER_IGNORE_AIRNAMES or shortname in SHOW_CACHE:
             if len(showname) > 0:
                 print("Skip show {}".format(showname))
 
@@ -197,7 +214,8 @@ def fill_gap(gap_datetime, gap_hours):
         (show_starthour, show_endhour) = get_show_hours_from_zookeeper(show_attributes['time'])
         glob_ar = glob.glob(glob_path)
         if len(glob_ar) > 0:
-            summary_msg = summary_msg + "Slot filled: {} \n".format(glob_ar[0])
+            #summary_msg = summary_msg + "Slot filled: {} \n".format(glob_ar[0])
+            pass
         else:
             # this check is last because it is expensive
             msg = check_audio_quality(show_filepath, 60)
