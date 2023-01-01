@@ -5,14 +5,16 @@
 # ZOOKEEPER_IGNORE_PLAYLISTS. Also sanity check potential files for size and
 # silence gaps in order to eliminate corrupt and inappropriate files. 
 #
-import os, random, datetime, urllib.request, json, glob, shutil, subprocess, getopt, sys
+import os, random, datetime, urllib.request, urllib.parse, json, glob, shutil, subprocess, getopt, sys
 import http.client
 from random import randint
 from add_disclaimer import insert_disclaimer
 
+
 # TODO:
 # don't give given DJ more than one show
 # check that PL runs full hour
+# check no sports preemption
 
 # list of Zookeeper playlists that should not be rebroadcasted truncated to
 # 15 characters. note these names may differ from the scheduled show name.
@@ -57,6 +59,8 @@ STAGE_DIR = "/Volumes/GoogleDrive/My Drive/show_uploads/"
 
 show_date = datetime.datetime.now()
 create_files = False
+
+
 
 def get_vault_shows(dateStr):
     gaps = []
@@ -181,6 +185,32 @@ def get_show_hours_from_zookeeper(time_range):
     end_hour = float(time_range[5:7]) + int(time_range[7:9])/60.0
     return (start_hour, end_hour)
 
+# creates a playlist for show in zookeeper
+def create_playlist(showname, airname, showdate, timerange, originaldate):
+    showdate_str = gap_datetime.strftime("%Y-%m-%d")
+    eventtext = originaldate.strftime("Rebroadcast from %B %-d, %Y at %-I%p")
+    showtime = originaldate.strftime("%H:00:00")
+    events = [{'type':'comment', 'comment': eventtext, 'created': showtime}]
+    attrs = {"name": showname, "airname": airname, "time": timerange, "date": showdate_str, 'events':events}
+    show = {'type': "show", "attributes": attrs}
+    data = {"data": show}
+    data_json = json.dumps(data)
+    apikey = None  # zookeeper key
+    if not apiKey:
+        print("Zookeeper API key not set.")
+        return
+
+    url = "https://zookeeper.stanford.edu/api/v1/playlist/"
+    req = urllib.request.Request(url, method='POST')
+    req.add_header("Content-type", "application/vnd.api+json")
+    req.add_header("Accept", "text/plain")
+    req.add_header("X-APIKEY", apikey)
+
+    response = urllib.request.urlopen(req, data=data_json.encode('utf-8'))
+    if response.status != 201:
+        print("Playlist not created: {}, {}".format(response.status, response.reason))
+
+
 def fill_gap(gap_datetime, gap_hours):
     show_files = []
     idx = 1000
@@ -194,9 +224,9 @@ def fill_gap(gap_datetime, gap_hours):
 
         showdate_str = show_filepath[-19:-4]
         showdate = datetime.datetime.strptime(showdate_str, "%Y-%m-%d-%H%M")
-        showinfo = get_show_info(showdate)
-        showname = showinfo['attributes']['name'] if showinfo else ''
-        airname = showinfo['attributes']['airname'] if showinfo else ''
+        showattrs = get_show_info(showdate)['attributes']
+        showname = showattrs['name'] if showattrs else ''
+        airname = showattrs['airname'] if showattrs else ''
 
         # use truncated compare becase names can have show specific suffixes.
         shortname = showname[0:PLAYLIST_KEY_MAX_LEN].strip().lower()
@@ -207,11 +237,10 @@ def fill_gap(gap_datetime, gap_hours):
             continue
 
         SHOW_CACHE[shortname] = True
-        show_attributes = showinfo['attributes']
         show_shortname = showname[0:20].strip()
         glob_path = STAGE_DIR + gap_datetime.strftime("%Y-%m-%d_%H%M*.mp3")
         duration_minutes = 60 - gap_datetime.minute
-        (show_starthour, show_endhour) = get_show_hours_from_zookeeper(show_attributes['time'])
+        (show_starthour, show_endhour) = get_show_hours_from_zookeeper(showattrs['time'])
         glob_ar = glob.glob(glob_path)
         if len(glob_ar) > 0:
             #summary_msg = summary_msg + "Slot filled: {} \n".format(glob_ar[0])
@@ -220,16 +249,20 @@ def fill_gap(gap_datetime, gap_hours):
             # this check is last because it is expensive
             msg = check_audio_quality(show_filepath, 60)
             if msg != 'ok':
-                print('Audio check error: {}, {}'.format(filepath, msg))
+                print('Audio check error: {}, {}'.format(show_filepath, msg))
                 continue
 
             end_hour = gap_datetime.hour + 1
             stage_start = gap_datetime.strftime("%Y-%m-%d_%H%M")
-            stage_filename = stage_start + "-{:02}00_{}-{}.mp3".format(end_hour, show_shortname, showdate_str)
+            starthour_str = gap_datetime.strftime("%H%M")
+            endhour_str = "{:02}00".format(end_hour)
+            stage_filename = stage_start + "-{}_{}-{}.mp3".format(endhour_str, show_shortname, showdate_str)
             stage_filepath = STAGE_DIR + stage_filename
             summary_msg = summary_msg + "Stage: {}, {}, {}\n".format(os.path.basename(show_filepath), stage_start, showname)
             if create_files:
                 insert_disclaimer(show_filepath, stage_filepath)
+                timerange = "{}-{}".format(starthour_str, endhour_str)
+                create_playlist(showname, 'Vault-meister', gap_datetime, timerange, showdate)
 
         gap_datetime = gap_datetime + datetime.timedelta(minutes=duration_minutes)
         gap_hours = gap_hours - duration_minutes/60.0
@@ -340,7 +373,7 @@ def get_show_file(safe_harbor):
     end_date = datetime.datetime.now() - datetime.timedelta(hours=24)
 
     ###### TESTING ONLY #########
-    #return (datetime.datetime(2022, 3, 3, 13), '/Users/Barbara/tmp/kzsu-archive/2022/Mar/03/kzsu-2022-03-03-1300.mp3')
+    #return (datetime.datetime(2022, 3, 3, 18), '/Users/Barbara/tmp/kzsu-archive/2022/Mar/03/kzsu-2022-03-03-1800.mp3')
 
     idx = 0
     while idx < 1000:
