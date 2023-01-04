@@ -15,6 +15,7 @@ from add_disclaimer import insert_disclaimer
 # don't give given DJ more than one show
 # check that PL runs full hour
 # check no sports preemption
+# do EAS check if < 2015
 
 # list of Zookeeper playlists that should not be rebroadcasted truncated to
 # 15 characters. note these names may differ from the scheduled show name.
@@ -26,7 +27,6 @@ ZOOKEEPER_IGNORE_PLAYLISTS_SOURCE = [
     'MHz presents ',
     'Zootopia',
     'Chaitime',
-    'Blues With a feeling',
     'Laptop Radio',
     'Time Traveler',
     'Radio Survivor',
@@ -45,6 +45,7 @@ ZOOKEEPER_IGNORE_PLAYLISTS_SOURCE = [
 ZOOKEEPER_IGNORE_AIRNAMES = [
     'Francis D', # doesn't want to be rebroadcasted
     'LJH Collage Crew',
+    'LJH Staff',
     'Raymundo',  # FCCs
     'M-SMOOTH',   # FCCs
 ]
@@ -195,8 +196,8 @@ def create_playlist(showname, airname, showdate, timerange, originaldate):
     show = {'type': "show", "attributes": attrs}
     data = {"data": show}
     data_json = json.dumps(data)
-    apikey = None  # zookeeper key
-    if not apiKey:
+    apikey = None
+    if not apikey:
         print("Zookeeper API key not set.")
         return
 
@@ -224,7 +225,8 @@ def fill_gap(gap_datetime, gap_hours):
 
         showdate_str = show_filepath[-19:-4]
         showdate = datetime.datetime.strptime(showdate_str, "%Y-%m-%d-%H%M")
-        showattrs = get_show_info(showdate)['attributes']
+        showinfo = get_show_info(showdate)
+        showattrs = showinfo['attributes'] if showinfo else None
         showname = showattrs['name'] if showattrs else ''
         airname = showattrs['airname'] if showattrs else ''
 
@@ -232,7 +234,7 @@ def fill_gap(gap_datetime, gap_hours):
         shortname = showname[0:PLAYLIST_KEY_MAX_LEN].strip().lower()
         if shortname in ZOOKEEPER_IGNORE_PLAYLISTS or showname.lower().find('rebroadcast') >= 0 or airname in ZOOKEEPER_IGNORE_AIRNAMES or shortname in SHOW_CACHE:
             if len(showname) > 0:
-                print("Skip show {}".format(showname))
+                print("Skip show {}, {}".format(airname, showname))
 
             continue
 
