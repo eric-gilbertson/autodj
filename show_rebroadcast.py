@@ -11,6 +11,9 @@ from random import randint
 from add_disclaimer import insert_disclaimer
 
 
+API_KEY=None # read from file upon invocation
+API_URL=None
+
 # TODO:
 # don't give given DJ more than one show
 # check that PL runs full hour
@@ -196,16 +199,14 @@ def create_playlist(showname, airname, showdate, timerange, originaldate):
     show = {'type': "show", "attributes": attrs}
     data = {"data": show}
     data_json = json.dumps(data)
-    apikey = None
-    if not apikey:
-        print("Zookeeper API key not set.")
+    if not API_KEY or not API_URL:
+        print("Zookeeper API key or URL not set.")
         return
 
-    url = "https://zookeeper.stanford.edu/api/v1/playlist/"
-    req = urllib.request.Request(url, method='POST')
+    req = urllib.request.Request(API_URL, method='POST')
     req.add_header("Content-type", "application/vnd.api+json")
     req.add_header("Accept", "text/plain")
-    req.add_header("X-APIKEY", apikey)
+    req.add_header("X-APIKEY", API_KEY)
 
     response = urllib.request.urlopen(req, data=data_json.encode('utf-8'))
     if response.status != 201:
@@ -232,11 +233,19 @@ def fill_gap(gap_datetime, gap_hours):
 
         # use truncated compare becase names can have show specific suffixes.
         shortname = showname[0:PLAYLIST_KEY_MAX_LEN].strip().lower()
-        if shortname in ZOOKEEPER_IGNORE_PLAYLISTS or showname.lower().find('rebroadcast') >= 0 or airname in ZOOKEEPER_IGNORE_AIRNAMES or shortname in SHOW_CACHE:
+        skipShow = shortname in ZOOKEEPER_IGNORE_PLAYLISTS
+        skipHost = airname in ZOOKEEPER_IGNORE_AIRNAMES
+        isRebroadcast = showname.lower().find('rebroadcast') >= 0
+        haveShow =  shortname in SHOW_CACHE
+        if skipShow or skipHost or isRebroadcast or haveShow:
             if len(showname) > 0:
-                print("Skip show {}, {}".format(airname, showname))
+                print("Skip show {}, {}, {}, {}, {}, {}".format(airname, showname, skipShow, skipHost, isRebroadcast, haveShow))
 
             continue
+        else:
+            res = input("Use {} {} [y|n]:".format(showname, showdate_str))
+            if res != "y":
+                continue
 
         SHOW_CACHE[shortname] = True
         show_shortname = showname[0:20].strip()
@@ -394,10 +403,25 @@ def get_show_file(safe_harbor):
     return (None, None)
 
 if __name__ == '__main__':
+    ZOOKEEPER_KEY_FILE='zookeeper-api.txt'
     parse_args(sys.argv[1:])
     if len(sys.argv) < 2:
         print('Usage {} -d YYYY-MM-DD -c [True|False]'.format(sys.argv[0]))
         sys.exit(0)
+
+    if os.path.exists(ZOOKEEPER_KEY_FILE):
+        file = open(ZOOKEEPER_KEY_FILE, 'r')
+        lines = file.readlines()
+        idx = 0
+        for line in lines:
+            if line.find('#') < 0:
+                API_KEY = line
+                API_URL = lines[idx+1]
+                break
+
+            idx += 1
+    else:
+        print("Warning: Zookeeper key file not found. " + ZOOKEEPER_KEY_FILE)
 
     gaps = 0
     weekday = show_date.weekday()
