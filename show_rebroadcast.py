@@ -11,7 +11,7 @@ from random import randint
 from add_disclaimer import insert_disclaimer
 
 
-API_KEY=None # read from file upon invocation
+API_KEY=None
 API_URL=None
 
 # TODO:
@@ -19,6 +19,7 @@ API_URL=None
 # check that PL runs full hour
 # check no sports preemption
 # do EAS check if < 2015
+# submit rebroadcast PL if hour is first hour of show & use DJ air name.
 
 # list of Zookeeper playlists that should not be rebroadcasted truncated to
 # 15 characters. note these names may differ from the scheduled show name.
@@ -32,6 +33,7 @@ ZOOKEEPER_IGNORE_PLAYLISTS_SOURCE = [
     'Chaitime',
     'Laptop Radio',
     'Time Traveler',
+    'Lift Jesus Higher',
     'Radio Survivor',
     'KZSU Time Trave',
     'LIVE!! KZSU Tim',
@@ -76,9 +78,10 @@ def get_vault_shows(dateStr):
     for show in shows:
         if show['title'].lower() == 'from the vault' or show['needs_sub']:
             kzsuStart = show['start_time']
-            startTime = float(kzsuStart[0:2]) + (float(kzsuStart[2:4]) / 60.0)
-            durationHours = int(show['duration']) / 60.0
-            gaps.append([startTime, durationHours])
+            startMins = float(kzsuStart[2:4]) / 60.0
+            startHour = float(kzsuStart[0:2]) # should only start on the hour
+            durationHours = (int(show['duration']) / 60.0) + startMins
+            gaps.append([startHour, durationHours])
 
     print("Found {} vault shows for {}".format(len(gaps), dateStr))
     return gaps
@@ -409,19 +412,19 @@ if __name__ == '__main__':
         print('Usage {} -d YYYY-MM-DD -c [True|False]'.format(sys.argv[0]))
         sys.exit(0)
 
-    if os.path.exists(ZOOKEEPER_KEY_FILE):
-        file = open(ZOOKEEPER_KEY_FILE, 'r')
-        lines = file.readlines()
-        idx = 0
-        for line in lines:
-            if line.find('#') < 0:
-                API_KEY = line
-                API_URL = lines[idx+1]
-                break
-
-            idx += 1
-    else:
-        print("Warning: Zookeeper key file not found. " + ZOOKEEPER_KEY_FILE)
+#    if os.path.exists(ZOOKEEPER_KEY_FILE):
+#        file = open(ZOOKEEPER_KEY_FILE, 'r')
+#        lines = file.readlines()
+#        idx = 0
+#        for line in lines:
+#            if line.find('#') < 0:
+#                API_KEY = line
+#                API_URL = lines[idx+1]
+#                break
+#
+#            idx += 1
+#    else:
+#        print("Warning: Zookeeper key file not found. " + ZOOKEEPER_KEY_FILE)
 
     gaps = 0
     weekday = show_date.weekday()
