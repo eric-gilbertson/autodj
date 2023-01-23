@@ -193,13 +193,13 @@ def get_show_hours_from_zookeeper(time_range):
     return (start_hour, end_hour)
 
 # creates a playlist for show in zookeeper
-def create_playlist(showname, airname, showdate, timerange, originaldate):
-    showdate_str = gap_datetime.strftime("%Y-%m-%d")
-    eventtext = originaldate.strftime("Rebroadcast from %B %-d, %Y at %-I%p")
-    showtime = originaldate.strftime("%H:00:00")
-    events = [{'type':'comment', 'comment': eventtext, 'created': showtime}]
-    attrs = {"name": showname, "airname": airname, "time": timerange, "date": showdate_str, 'events':events}
-    show = {'type': "show", "attributes": attrs}
+def create_playlist(showid, showhour, gap_datetime, gap_timerange):
+    gapdate_str = gap_datetime.strftime("%Y-%m-%d")
+    attrs = {"rebroadcast":True, "time": gap_timerange, "date": gapdate_str}
+    show_timerange = "{:02d}00-{:02d}00".format(showhour, (showhour+1) % 24)
+    meta = { "fromtime": show_timerange}
+    relationships = { "origin": { "data": { "type": "show", "id": showid }}}
+    show = {'type': "show", "attributes": attrs, "meta": meta, "relationships": relationships}
     data = {"data": show}
     data_json = json.dumps(data)
     if not API_KEY or not API_URL:
@@ -228,9 +228,14 @@ def fill_gap(gap_datetime, gap_hours):
             break
 
         showdate_str = show_filepath[-19:-4]
+        showhour_int = int(show_filepath[-8:-6])
         showdate = datetime.datetime.strptime(showdate_str, "%Y-%m-%d-%H%M")
         showinfo = get_show_info(showdate)
-        showattrs = showinfo['attributes'] if showinfo else None
+        if not showinfo:
+            continue
+
+        showid = showinfo['id']
+        showattrs = showinfo['attributes']
         showname = showattrs['name'] if showattrs else ''
         airname = showattrs['airname'] if showattrs else ''
 
@@ -241,9 +246,7 @@ def fill_gap(gap_datetime, gap_hours):
         isRebroadcast = showname.lower().find('rebroadcast') >= 0
         haveShow =  shortname in SHOW_CACHE
         if skipShow or skipHost or isRebroadcast or haveShow:
-            if len(showname) > 0:
-                print("Skip show {}, {}, {}, {}, {}, {}".format(airname, showname, skipShow, skipHost, isRebroadcast, haveShow))
-
+            print("Skip show {}, {}, {}, {}, {}, {}".format(airname, showname, skipShow, skipHost, isRebroadcast, haveShow))
             continue
         else:
             res = input("Use {} {} [y|n]:".format(showname, showdate_str))
@@ -275,8 +278,8 @@ def fill_gap(gap_datetime, gap_hours):
             summary_msg = summary_msg + "Stage: {}, {}, {}\n".format(os.path.basename(show_filepath), stage_start, showname)
             if create_files:
                 insert_disclaimer(show_filepath, stage_filepath)
-                timerange = "{}-{}".format(starthour_str, endhour_str)
-                create_playlist(showname, 'Vault-meister', gap_datetime, timerange, showdate)
+                gap_timerange = "{}-{}".format(starthour_str, endhour_str)
+                create_playlist(showid, showhour_int, gap_datetime, gap_timerange)
 
         gap_datetime = gap_datetime + datetime.timedelta(minutes=duration_minutes)
         gap_hours = gap_hours - duration_minutes/60.0
@@ -387,7 +390,7 @@ def get_show_file(safe_harbor):
     end_date = datetime.datetime.now() - datetime.timedelta(hours=24)
 
     ###### TESTING ONLY #########
-    #return (datetime.datetime(2022, 3, 3, 18), '/Users/Barbara/tmp/kzsu-archive/2022/Mar/03/kzsu-2022-03-03-1800.mp3')
+    #return (datetime.datetime(2022, 3, 4, 9), '/Users/Barbara/tmp/kzsu-archive/2022/Mar/03/kzsu-2022-03-04-0700.mp3')
 
     idx = 0
     while idx < 1000:
@@ -412,19 +415,20 @@ if __name__ == '__main__':
         print('Usage {} -d YYYY-MM-DD -c [True|False]'.format(sys.argv[0]))
         sys.exit(0)
 
-#    if os.path.exists(ZOOKEEPER_KEY_FILE):
-#        file = open(ZOOKEEPER_KEY_FILE, 'r')
-#        lines = file.readlines()
-#        idx = 0
-#        for line in lines:
-#            if line.find('#') < 0:
-#                API_KEY = line
-#                API_URL = lines[idx+1]
-#                break
-#
-#            idx += 1
-#    else:
-#        print("Warning: Zookeeper key file not found. " + ZOOKEEPER_KEY_FILE)
+    if os.path.exists(ZOOKEEPER_KEY_FILE):
+        file = open(ZOOKEEPER_KEY_FILE, 'r')
+        lines = file.readlines()
+        idx = 0
+        for line in lines:
+            if line.find('#') < 0:
+                API_KEY = line[0:-1]
+                API_URL = lines[idx+1][0:-1]
+                break
+
+            idx += 1
+    else:
+        print("Warning: Zookeeper key file not found. " + ZOOKEEPER_KEY_FILE)
+        sys.exit(0)
 
     gaps = 0
     weekday = show_date.weekday()
