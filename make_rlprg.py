@@ -1,6 +1,6 @@
 ##!/usr/bin/python
 
-import datetime, sys, getopt, os, shutil, commands, time
+import datetime, sys, getopt, os, shutil, commands, time, filecmp
 from array import *
 import glob
 import urllib
@@ -188,6 +188,20 @@ def endtime_from_duration(kzsu_start_time, duration_secs):
     end_time = minutes_to_kzsutime(end_mins)
     return end_time
 
+# copy and then compare the files. needed because we get occasional copy
+# errors when copying from GDrive to the local drive.
+def safe_copy(src_file, dest_file):
+    print("copy to staging dir: {}, {}".format(src_file, dest_file))
+    shutil.copy(src_file, dest_file)
+
+    if not filecmp.cmp(src_file, dest_file, shallow=False):
+        print("File copy error1: {}, {}".format(src_file, dest_file))
+        os.remove(dest_file)
+        time.sleep(5)
+        shutil.copy(src_file, dest_file)
+        if not filecmp.cmp(src_file, dest_file, shallow=False):
+            print("File copy error2: {}, {}".format(src_file, dest_file))
+
 
 parse_args(sys.argv[1:])
 shows_path = UPLOAD_DIR + show_date + "*.mp3"
@@ -249,7 +263,8 @@ for show_line in shows:
 
     cache_file = CACHE_DIR + '/' + show.file_name
     if not os.path.exists(cache_file):
-        shutil.copyfile(show_line, cache_file)
+        safe_copy(show_line, cache_file)
+        #shutil.copyfile(show_line, cache_file)
 
     emit_program_play(cache_file, show_title)
 
