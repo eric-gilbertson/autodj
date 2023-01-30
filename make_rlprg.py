@@ -38,7 +38,7 @@ show_date = datetime.datetime.now().strftime("%Y-%m-%d")
 # parse show file entry into a structure
 class ShowInfo():
     def __init__(self, show_line):
-        print("show: " + show_line);
+        log_it("show: " + show_line);
         file_name = show_line[len(UPLOAD_DIR):]
         info_ar = file_name.split('_')
         time_ar = info_ar[1].split('-')
@@ -49,6 +49,12 @@ class ShowInfo():
         self.end_time = time_ar[1]
         self.title = info_ar[2]
 
+def log_it(msg):
+    print(msg)
+    timestr = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S: ")
+    with open('/tmp/make_rlprg_log.txt', 'a') as logfile:
+        logfile.write(timestr + msg + '\n')
+
 
 def parse_args(argv):
    global show_date, is_today
@@ -56,23 +62,23 @@ def parse_args(argv):
    try:
       opts, args = getopt.getopt(argv,"d:",["date"])
    except getopt.GetoptError:
-      print ('test.py -d YYYY-MM-DD')
+      log_it ('test.py -d YYYY-MM-DD')
       sys.exit(2)
 
    for opt, arg in opts:
       if opt == '-h':
-         print ('test.py -date YYYY-MM-DD')
+         log_it ('test.py -date YYYY-MM-DD')
          sys.exit()
       elif opt in ("-d", "--date"):
          is_today = False
          show_date = arg
 
-   print ('Show date: {}'.format(show_date))
+   log_it ('Show date: {}'.format(show_date))
 
 # converts HH:MM to seconds into the day.
 def emit_line(line):
     out_file.write(line + '\n')
-    #print(line)
+    #log_it(line)
 
 def get_rltime(time_str):
     hours = time_str[0:2]
@@ -126,7 +132,7 @@ def add_extras_for_day(shows, day_ord, date_str):
         # copy is okay if files are small. reconsider if the get large.
         if not os.path.isfile(add_item):
             shutil.copy(extra, add_item)
-            print(" add: " + add_item)
+            log_it(" add: " + add_item)
             shows.append(add_item)
 
 # return duration in seconds from KZSU time. not using Date because KZSU time ends at 3000hours.
@@ -144,7 +150,7 @@ def get_mp3_duration(filePath):
     try:
         cmd = FFMPEG_CMD + "-i '" + filePath + "'"
         ret_val = commands.getstatusoutput(cmd)
-        print("Execute: {} returned {}, {}".format(cmd, ret_val[0], ret_val[1]))
+        log_it("Execute: {} returned {}, {}".format(cmd, ret_val[0], ret_val[1]))
         if ret_val[1] and ret_val[1].find("Duration:") > 0:
             time_str = ret_val[1]
             idx1 = time_str.index('Duration:') + 9
@@ -153,7 +159,7 @@ def get_mp3_duration(filePath):
             time = datetime.datetime.strptime(time_str, '%H:%M:%S.%f')
             duration = time.second + time.minute * 60 + time.hour * 3600
     except Exception as ioe:
-        print('Exception getting duration for: {}, {}'.format(cmd, ioe))
+        log_it('Exception getting duration for: {}, {}'.format(cmd, ioe))
 
     return duration
 
@@ -168,9 +174,9 @@ def clear_show_cache():
     for file in cache_files:
         mtime = time.ctime(os.path.getmtime(file))
         mdatetime = datetime.datetime.strptime(mtime, "%c")
-        print("time: {}".format(mdatetime))
+        log_it("time: {}".format(mdatetime))
         if mdatetime.timetuple().tm_yday < now_day:
-            print("delete cache file: " + file)
+            log_it("delete cache file: " + file)
             os.remove(file)
           
 def kzsutime_to_minutes(kzsu_time):
@@ -191,16 +197,16 @@ def endtime_from_duration(kzsu_start_time, duration_secs):
 # copy and then compare the files. needed because we get occasional copy
 # errors when copying from GDrive to the local drive.
 def safe_copy(src_file, dest_file):
-    print("copy to staging dir: {}, {}".format(src_file, dest_file))
+    log_it("copy to staging dir: {}, {}".format(src_file, dest_file))
     shutil.copy(src_file, dest_file)
 
     if not filecmp.cmp(src_file, dest_file, shallow=False):
-        print("File copy error1: {}, {}".format(src_file, dest_file))
+        log_it("File copy error1: {}, {}".format(src_file, dest_file))
         os.remove(dest_file)
         time.sleep(5)
         shutil.copy(src_file, dest_file)
         if not filecmp.cmp(src_file, dest_file, shallow=False):
-            print("File copy error2: {}, {}".format(src_file, dest_file))
+            log_it("File copy error2: {}, {}".format(src_file, dest_file))
 
 
 parse_args(sys.argv[1:])
@@ -213,10 +219,10 @@ run_time = datetime.datetime.now().time()
 
 clear_show_cache()
 
-print('shows for {0}, {1}'.format(show_date, show_day))
+log_it('shows for {0}, {1}'.format(show_date, show_day))
 shows = glob.glob(shows_path)
 if len(shows) == 0:
-    print('No shows for ' + shows_path)
+    log_it('No shows for ' + shows_path)
     sys.exit(1)
 
 #add_extras_for_day(shows, show_day, show_date)
@@ -243,7 +249,7 @@ for show_line in shows:
     if is_today and is_valid_time:
         start_time_obj = datetime.datetime.strptime(start_time, '%H%M').time()
         if start_time_obj < run_time:
-            print("skip past show: " + show_title)
+            log_it("skip past show: " + show_title)
             continue
 
     block_start_time = start_time
