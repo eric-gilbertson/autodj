@@ -243,6 +243,11 @@ for show_line in shows:
     end_time = show.end_time
     length_mins = kzsutime_to_minutes(end_time) - kzsutime_to_minutes(start_time)
 
+    file_duration = get_mp3_duration(show_line)
+    if file_duration < 1:
+        log_it("skip corrupt file: {}, {}".format(show_line, file_duration))
+        continue
+
     # skip this check for shows after midnight (KZSU time)
     is_valid_time = int(start_time) < 2400
     if is_today and is_valid_time:
@@ -276,7 +281,6 @@ for show_line in shows:
     # skip this check if show start >= midnight or if start and end times are equal
     if is_valid_time and length_mins > 2:
         schedule_duration = get_schedule_duration(start_time, end_time)
-        file_duration = get_mp3_duration(show_line)
         time_skew = abs(schedule_duration - file_duration)
         is_short =  file_duration < schedule_duration
 
