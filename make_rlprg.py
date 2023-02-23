@@ -1,9 +1,9 @@
-##!/usr/bin/python
+##!/usr/bin/python3
 
-import datetime, sys, getopt, os, shutil, commands, time, filecmp
+import datetime, sys, getopt, os, shutil, time, filecmp, subprocess
 from array import *
 import glob
-import urllib
+import urllib.parse
 
 HOME_DIR = os.getenv("HOME")
 GDRIVE_PATH = '/Volumes/GoogleDrive/My Drive'
@@ -14,7 +14,7 @@ RLDJ_HOME = HOME_DIR + '/Music/Radiologik'
 RLDJ_SCRIPTS = RLDJ_HOME + '/Scripts/'
 
 # NOTE: the tabs in the following defines ARE REQUIRED.
-SILENCE_FILE = '	file://' + urllib.quote(CACHE_DIR + '/silence.aiff')
+SILENCE_FILE = '	file://' + urllib.parse.quote(CACHE_DIR + '/silence.aiff')
 OUTRO_FILE = CACHE_DIR + '/show_fill.mp3'
 
 START_AUTODJ = SILENCE_FILE + '	false	-1			file:///Users/engineering/Music/Radiologik/Scripts/AutodjOn.applescript			Autodj - on'
@@ -117,7 +117,7 @@ def emit_LID():
     emit_program_play(lid_file, "LID")
 
 def emit_program_play(show_file, show_title):
-    show_file_encoded = urllib.quote(show_file)
+    show_file_encoded = urllib.parse.quote(show_file)
     play_line = PLAY_PROGRAM.format(show_file_encoded, show_title)
     emit_line(play_line)
 
@@ -145,21 +145,20 @@ def get_schedule_duration(start_time, end_time):
 # return time length of an mp3 file using ffmpeg or -1 if invalid.
 # assumes user has ffmpeg in PATH.
 def get_mp3_duration(filePath):
-    FFMPEG_CMD = "/usr/local/bin/ffmpeg -hide_banner "
+    FFMPEG_CMD = "/usr/local/bin/ffmpeg"
     duration = -1
     try:
-        cmd = FFMPEG_CMD + "-i '" + filePath + "'"
-        ret_val = commands.getstatusoutput(cmd)
-        log_it("Execute: {} returned {}, {}".format(cmd, ret_val[0], ret_val[1]))
-        if ret_val[1] and ret_val[1].find("Duration:") > 0:
-            time_str = ret_val[1]
+        ret_val = subprocess.run([FFMPEG_CMD, '-hide_banner', '-i', filePath], shell=False, capture_output=True, text=True)
+        log_it("Execute returned: {}, {}".format(ret_val.stdout, ret_val.stderr))
+        if ret_val.returncode == 1 and ret_val.stderr.find("Duration:") > 0:
+            time_str = ret_val.stderr
             idx1 = time_str.index('Duration:') + 9
             idx2 = time_str.index(',', idx1)
             time_str = time_str[idx1:idx2].strip()
             time = datetime.datetime.strptime(time_str, '%H:%M:%S.%f')
             duration = time.second + time.minute * 60 + time.hour * 3600
     except Exception as ioe:
-        log_it('Exception getting duration for: {}, {}'.format(cmd, ioe))
+        log_it('Exception getting duration for: {}, {}'.format(filePath, ioe))
 
     return duration
 
