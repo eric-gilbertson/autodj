@@ -1,4 +1,4 @@
-##!/usr/bin/python3
+#!/usr/bin/python3
 
 import datetime, sys, getopt, os, shutil, time, filecmp, subprocess
 from array import *
@@ -6,11 +6,13 @@ import glob
 import urllib.parse
 
 HOME_DIR = os.getenv("HOME")
-GDRIVE_PATH = '/Volumes/GoogleDrive/My Drive'
-#GDRIVE_PATH = '/Users/Barbara/studioq'
+UPLOAD_DIR = '/Volumes/Public-1/show_uploads/'
+#UPLOAD_DIR = '/Volumes/GoogleDrive/My Drive/show_uploads/'
+#UPLOAD_PATH = '/Users/Barbara/studioq'
 CACHE_DIR = HOME_DIR + '/Music/show_cache'
 
 RLDJ_HOME = HOME_DIR + '/Music/Radiologik'
+RLDJ_PROGRAMS = RLDJ_HOME + '/Programs/'
 RLDJ_SCRIPTS = RLDJ_HOME + '/Scripts/'
 
 # NOTE: the tabs in the following defines ARE REQUIRED.
@@ -28,7 +30,6 @@ START_ZOOTOPIA_TIMED = SILENCE_FILE + '	false	{0}	1					ZootopiaInt - on'
 START_ZOOTOPIA = SILENCE_FILE + '	false	-1	1					Zootopia - on'
 PLAY_PROGRAM  = '	file://{}	false	-1					{}'
 
-UPLOAD_DIR = GDRIVE_PATH + '/show_uploads/'
 
 is_today = True
 run_immediate = False
@@ -213,7 +214,7 @@ shows_path = UPLOAD_DIR + show_date + "*.mp3"
 show_day = datetime.datetime.strptime(show_date, '%Y-%m-%d').strftime('%A')
 is_weekend = show_day == 'Saturday' or show_day == 'Sunday'
 is_sunday = show_day == 'Sunday'
-out_file = open('{}/{}.rlprg'.format(UPLOAD_DIR,show_day), "w");
+out_file = open('{}/{}.rlprg'.format(RLDJ_PROGRAMS, show_day), "w");
 run_time = datetime.datetime.now().time()
 
 clear_show_cache()
@@ -265,8 +266,8 @@ for show_line in shows:
         emit_zootopia_end(block_start_time)
 
         # in case autodj was enabled, e.g. PACC meeting on Monday evening.
-        if is_first:
-            emit_line(START_AUTODJ)
+#        if is_first:
+#            emit_line(START_AUTODJ)
 
     if start_time.endswith('00'):
         emit_LID()
