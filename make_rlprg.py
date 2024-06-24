@@ -6,7 +6,7 @@ import glob
 import urllib.parse
 
 HOME_DIR = os.getenv("HOME")
-UPLOAD_DIR = '/Volumes/Public-1/show_uploads/'
+UPLOAD_DIR = '/Volumes/Public/show_uploads/'
 #UPLOAD_DIR = '/Volumes/GoogleDrive/My Drive/show_uploads/'
 #UPLOAD_PATH = '/Users/Barbara/studioq'
 CACHE_DIR = HOME_DIR + '/Music/show_cache'
