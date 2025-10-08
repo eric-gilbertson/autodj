@@ -4,11 +4,10 @@ import datetime, sys, getopt, os, shutil, time, filecmp, subprocess
 from array import *
 import glob
 import urllib.parse
+from smtp import send_email
 
 HOME_DIR = os.getenv("HOME")
-UPLOAD_DIR = '/Volumes/Public/show_uploads/'
-#UPLOAD_DIR = '/Volumes/GoogleDrive/My Drive/show_uploads/'
-#UPLOAD_PATH = '/Users/Barbara/studioq'
+UPLOAD_DIR = '/Volumes/air-checks/show_uploads/'
 CACHE_DIR = HOME_DIR + '/Music/show_cache'
 
 RLDJ_HOME = HOME_DIR + '/Music/Radiologik'
@@ -209,103 +208,110 @@ def safe_copy(src_file, dest_file):
             log_it("File copy error2: {}, {}".format(src_file, dest_file))
 
 
-parse_args(sys.argv[1:])
-shows_path = UPLOAD_DIR + show_date + "*.mp3"
-show_day = datetime.datetime.strptime(show_date, '%Y-%m-%d').strftime('%A')
-is_weekend = show_day == 'Saturday' or show_day == 'Sunday'
-is_sunday = show_day == 'Sunday'
-out_file = open('{}/{}.rlprg'.format(RLDJ_PROGRAMS, show_day), "w");
-run_time = datetime.datetime.now().time()
-
-clear_show_cache()
-
-log_it('shows for {0}, {1}'.format(show_date, show_day))
-shows = glob.glob(shows_path)
-if len(shows) == 0:
-    log_it('No shows for ' + shows_path)
-    sys.exit(1)
-
-#add_extras_for_day(shows, show_day, show_date)
-shows.sort()
-
-# TODO - get actual durations
-emit_line('Duration:19807')
-
-#TODO - handle no shows case
-
-TIME_SKEW_SECONDS = 30
-prev_end_time = False
-prev_silence = False
-is_first = True
-for show_line in shows:
-    show = ShowInfo(show_line)
-    show_title = show.title
-    start_time = show.start_time
-    end_time = show.end_time
-    length_mins = kzsutime_to_minutes(end_time) - kzsutime_to_minutes(start_time)
-
-    file_duration = get_mp3_duration(show_line)
-    if file_duration < 1:
-        log_it("skip corrupt file: {}, {}".format(show_line, file_duration))
-        continue
-
-    # skip this check for shows after midnight (KZSU time)
-    is_valid_time = int(start_time) < 2400
-    if is_today and is_valid_time:
-        start_time_obj = datetime.datetime.strptime(start_time, '%H%M').time()
-        if start_time_obj < run_time:
-            log_it("skip past show: " + show_title)
+if __name__ == "__main__":
+    if not os.path.exists(UPLOAD_DIR):
+        msg = "Error: upload directory is not available. -{}-".format(UPLOAD_DIR)
+        log_it(msg)
+        send_email("computing@kzsu.stanford.edu", "Error: uploaded shows not staged.", msg)
+        sys.exit(1)
+    
+    parse_args(sys.argv[1:])
+    shows_path = UPLOAD_DIR + show_date + "*.mp3"
+    show_day = datetime.datetime.strptime(show_date, '%Y-%m-%d').strftime('%A')
+    is_weekend = show_day == 'Saturday' or show_day == 'Sunday'
+    is_sunday = show_day == 'Sunday'
+    out_file = open('{}/{}.rlprg'.format(RLDJ_PROGRAMS, show_day), "w");
+    run_time = datetime.datetime.now().time()
+    
+    clear_show_cache()
+    
+    log_it('shows for {0}, {1}'.format(show_date, show_day))
+    shows = glob.glob(shows_path)
+    if len(shows) == 0:
+        log_it('No shows for ' + shows_path)
+        sys.exit(1)
+    
+    #add_extras_for_day(shows, show_day, show_date)
+    shows.sort()
+    
+    # TODO - get actual durations
+    emit_line('Duration:19807')
+    
+    #TODO - handle no shows case
+    
+    TIME_SKEW_SECONDS = 30
+    prev_end_time = False
+    prev_silence = False
+    is_first = True
+    for show_line in shows:
+        show = ShowInfo(show_line)
+        show_title = show.title
+        start_time = show.start_time
+        end_time = show.end_time
+        length_mins = kzsutime_to_minutes(end_time) - kzsutime_to_minutes(start_time)
+    
+        file_duration = get_mp3_duration(show_line)
+        if file_duration < 1:
+            log_it("skip corrupt file: {}, {}".format(show_line, file_duration))
             continue
-
-    block_start_time = start_time
-
-    if is_first or (prev_end_time and prev_end_time != block_start_time):
-        if prev_end_time:
-            emit_zootopia_start()
-
-        emit_zootopia_end(block_start_time)
-
-        # in case autodj was enabled, e.g. PACC meeting on Monday evening.
-#        if is_first:
-#            emit_line(START_AUTODJ)
-
-    if start_time.endswith('00'):
-        emit_LID()
-
-    cache_file = CACHE_DIR + '/' + show.file_name
-    if not os.path.exists(cache_file):
-        safe_copy(show_line, cache_file)
-        #shutil.copyfile(show_line, cache_file)
-
-    emit_program_play(cache_file, show_title)
-
-    # skip this check if show start >= midnight or if start and end times are equal
-    if is_valid_time and length_mins > 2:
-        schedule_duration = get_schedule_duration(start_time, end_time)
-        time_skew = abs(schedule_duration - file_duration)
-        is_short =  file_duration < schedule_duration
-
-        # do something if time skew > 30 seconds
-        if file_duration > 0 and time_skew > TIME_SKEW_SECONDS:
-            # if gt 5 minutes then turn zootopia back on and adjust end time.
-            if is_short:
-                if time_skew > 300:
-                    end_time = endtime_from_duration(start_time, file_duration)
-                else:
-                    if file_duration < schedule_duration:
-                        emit_program_play(OUTRO_FILE, "outro")
-
+    
+        # skip this check for shows after midnight (KZSU time)
+        is_valid_time = int(start_time) < 2400
+        if is_today and is_valid_time:
+            start_time_obj = datetime.datetime.strptime(start_time, '%H%M').time()
+            if start_time_obj < run_time:
+                log_it("skip past show: " + show_title)
+                continue
+    
+        block_start_time = start_time
+    
+        if is_first or (prev_end_time and prev_end_time != block_start_time):
+            if prev_end_time:
+                emit_zootopia_start()
+    
+            emit_zootopia_end(block_start_time)
+    
+            # in case autodj was enabled, e.g. PACC meeting on Monday evening.
+    #        if is_first:
+    #            emit_line(START_AUTODJ)
+    
+        if start_time.endswith('00'):
+            emit_LID()
+    
+        cache_file = CACHE_DIR + '/' + show.file_name
+        if not os.path.exists(cache_file):
+            safe_copy(show_line, cache_file)
+            #shutil.copyfile(show_line, cache_file)
+    
+        emit_program_play(cache_file, show_title)
+    
+        # skip this check if show start >= midnight or if start and end times are equal
+        if is_valid_time and length_mins > 2:
+            schedule_duration = get_schedule_duration(start_time, end_time)
+            time_skew = abs(schedule_duration - file_duration)
+            is_short =  file_duration < schedule_duration
+    
+            # do something if time skew > 30 seconds
+            if file_duration > 0 and time_skew > TIME_SKEW_SECONDS:
+                # if gt 5 minutes then turn zootopia back on and adjust end time.
+                if is_short:
+                    if time_skew > 300:
+                        end_time = endtime_from_duration(start_time, file_duration)
+                    else:
+                        if file_duration < schedule_duration:
+                            emit_program_play(OUTRO_FILE, "outro")
+    
+                        emit_break(end_time)
+                elif time_skew > TIME_SKEW_SECONDS:
                     emit_break(end_time)
-            elif time_skew > TIME_SKEW_SECONDS:
-                emit_break(end_time)
-
-    is_first = False
-    prev_end_time = end_time
-
-# reenable Zootopia
-emit_zootopia_start()
-
-out_file.close()
+    
+        is_first = False
+        prev_end_time = end_time
+    
+    # reenable Zootopia
+    emit_zootopia_start()
+    
+    out_file.close()
 
 
 
