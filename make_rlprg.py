@@ -212,7 +212,7 @@ if __name__ == "__main__":
     if not os.path.exists(UPLOAD_DIR):
         msg = "Error: upload directory is not available. -{}-".format(UPLOAD_DIR)
         log_it(msg)
-        send_email("computing@kzsu.stanford.edu", "Error: uploaded shows not staged.", msg)
+        send_email("computing-alerts@kzsu.stanford.edu", "Error: uploaded shows not staged.", msg)
         sys.exit(1)
     
     parse_args(sys.argv[1:])
@@ -252,7 +252,9 @@ if __name__ == "__main__":
     
         file_duration = get_mp3_duration(show_line)
         if file_duration < 1:
-            log_it("skip corrupt file: {}, {}".format(show_line, file_duration))
+            msg = "Skip corrupt show file: {}, {}".format(show_line, file_duration)
+            log_it(msg)
+            send_email("computing-alerts@kzsu.stanford.edu", "Error: uploaded show file not staged.", msg)
             continue
     
         # skip this check for shows after midnight (KZSU time)
