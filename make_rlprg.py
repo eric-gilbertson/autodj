@@ -148,9 +148,10 @@ def get_mp3_duration(filePath):
     FFMPEG_CMD = "/usr/local/bin/ffmpeg"
     duration = -1
     try:
-        ret_val = subprocess.run([FFMPEG_CMD, '-hide_banner', '-i', filePath], shell=False, capture_output=True, text=True)
-        log_it("Execute returned: {}, {}".format(ret_val.stdout, ret_val.stderr))
-        if ret_val.returncode == 1 and ret_val.stderr.find("Duration:") > 0:
+        ret_val = subprocess.run([FFMPEG_CMD, '-hide_banner', '-i', filePath], shell=False, capture_output=True, text=True, encoding="utf-8", errors="ignore")
+        log_it("Execute returned: {}, {}, {}".format(ret_val.returncode, ret_val.stdout, ret_val.stderr))
+        # don't check return code, ffmpeg versions between 0 & 1 for success.
+        if ret_val.stderr.find("Duration:") > 0:
             time_str = ret_val.stderr
             idx1 = time_str.index('Duration:') + 9
             idx2 = time_str.index(',', idx1)
