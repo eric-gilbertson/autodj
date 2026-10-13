@@ -12,12 +12,8 @@ SEGMENT_MINUTES = 60
 def log_it(msg):
    print(msg, flush=True)
 
-def make2digit(some_int):
-    res = "{:02d}".format(some_int)
-    return res
-
 def execute_ffmpeg_command(cmd):
-    cmd = "/usr/local/bin/ffmpeg -hide_banner " + cmd
+    cmd = "/usr/local/bin/ffmpeg -y -hide_banner " + cmd
     #print("Execute: {}".format(cmd))
     p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     (output, err) = p.communicate()
@@ -35,17 +31,17 @@ def record_segment():
     segment_seconds = SEGMENT_MINUTES * 60 - offset_seconds
     minutes = math.floor(segment_seconds / 60)
     seconds = "{:.2f}".format(segment_seconds % 60)
-    segment_file = now.strftime('kzsu-%Y-%m-%d-%H00.mp3.tmp')
+    segment_file = now.strftime('kzsu-%Y-%m-%d-%H00.mp3')
     cmd = '-i {} -c copy -t 00:{}:{} {}'.format(STREAM_URL, minutes, seconds, segment_file)
-    log_it("cmd: " + cmd)
-    return
-    execute_ffmpeg_command(cmd)
+    time_str = now.strftime('%H:%M:%S.%f')
+    log_it(time_str + ': ' + cmd)
+    if execute_ffmpeg_command(cmd) != 0:
+        log_it("Exiting: stream error")
+
+    log_it("done recording")
 
 
-
-record_segment()
-
-#while True:
-#    record_segment()
+while True:
+    record_segment()
 
 
